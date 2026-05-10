@@ -2,6 +2,8 @@
 
 # RAG against the machine
 
+[![Lint](https://github.com/mpouillo/42-rag-against-the-machine/actions/workflows/lint.yml/badge.svg)](https://github.com/mpouillo/42-rag-against-the-machine/actions/workflows/lint.yml)
+
 - [Description](#description)
 - [Instructions](#instructions)
 - [Resources](#resources)
