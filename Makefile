@@ -9,7 +9,7 @@ UV_PROJECT_ENVIRONMENT ?= .venv
 
 SRC = src
 
-DEPS =	bm25s \
+DEPS =	bm25s[full] \
 		chromadb \
 		dspy \
 		fire \
@@ -17,8 +17,10 @@ DEPS =	bm25s \
 		langchain \
 		langchain-text-splitters \
 		mypy \
+		ollama \
 		pudb \
 		pydantic \
+		PyStemmer \
 		transformers \
 		tqdm
 
@@ -29,6 +31,7 @@ install:
 		echo "installing uv..."; \
 		curl -LsSf https://astral.sh/uv/install.sh | sh >/dev/null 2>&1; \
 	fi
+	@$(UV) add $(DEPS)
 	@echo "Syncing dependencies..."
 	@$(UV) sync
 
