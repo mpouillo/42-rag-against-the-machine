@@ -53,3 +53,4 @@ $> make fclean
 
 - [What is RAG? (Google Cloud)](https://cloud.google.com/use-cases/retrieval-augmented-generation)
 - [LangChain Reference Docs](https://reference.langchain.com/)
+- [Python Fire Guide](https://google.github.io/python-fire/guide/)
