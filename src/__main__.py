@@ -9,8 +9,7 @@ from pathlib import Path
 from langchain_text_splitters import RecursiveCharacterTextSplitter, Language
 from langchain_core.documents import Document
 from .models import MinimalSource, MinimalSearchResults, StudentSearchResults
-from typing import List, Dict, Any
-from .constants import *
+from typing import List
 
 
 class Indexer:
@@ -84,22 +83,27 @@ class Indexer:
         retriever.index(corpus_tokens)
 
         json_sources = [doc.model_dump() for doc in chunks]
-        retriever.save(INDEX_PATH, corpus=json_sources)
+        retriever.save(save_path, corpus=json_sources)
 
 
-class RagInterface:
+class RagInterface(object):
+    def __init__(self):
+        self.index_path = "data/processed/bm25_index"
+        self.chunk_path = "data/processed/chunks"
+        self.path_to_process = "data/raw"
+
     def index(self, max_chunk_size: int = 2000) -> None:
-        indexer = Indexer(PATH_TO_PROCESS)
+        indexer = Indexer(self.path_to_process)
 
         chunks = indexer.chunkify(["python", "markdown"], max_chunk_size)
-        indexer.save_chunks(chunks, CHUNK_PATH)
+        indexer.save_chunks(chunks, self.chunk_path)
 
-        indexer.index_to_file(chunks, INDEX_PATH)
-        print(f"Ingestion complete! Indices saved under {INDEX_PATH}")
+        indexer.index_to_file(chunks, self.index_path)
+        print(f"Ingestion complete! Indices saved under {self.index_path}")
 
     def search(self, query: str, k: int = 10) -> None:
         try:
-            retriever = bm25s.BM25.load(INDEX_PATH, load_corpus=True)
+            retriever = bm25s.BM25.load(self.index_path, load_corpus=True)
         except Exception:
             sys.exit("Error: no index found")
 
