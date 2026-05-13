@@ -10,6 +10,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter, Language
 from langchain_core.documents import Document
 from .models import MinimalSource, MinimalSearchResults, StudentSearchResults
 from typing import List, Dict, Any
+from .constants import *
 
 
 class Indexer:
@@ -49,51 +50,52 @@ class Indexer:
 
         return text_splitter.split_documents(docs)
 
-    def process_chunks(self, chunks: list[Document]) -> List[Dict[str, Any]]:
-        processed_sources = []
+    def save_chunks(self, chunks: list[Document], path_to_save: str) -> None:
+        path = Path(path_to_save)
+        path.mkdir(parents=True, exist_ok=True)
+        file = path / "chunks.json"
+
+        chunk_list = []
 
         for chunk in chunks:
             file_path = chunk.metadata.get("path", "")
             start_index = chunk.metadata.get("start_index", 0)
             end_index = start_index + len(chunk.page_content)
 
-            source_data = {
-                    "file_path": file_path,
-                    "first_character_index": start_index,
-                    "last_character_index": end_index
-                }
-
-            source = {
-                "source": MinimalSource(**source_data).model_dump_json(),
+            chunk_data = {
+                "file_path": file_path,
+                "first_character_index": start_index,
+                "last_character_index": end_index,
                 "content": chunk.page_content
             }
 
-            processed_sources.append(source)
+            chunk_list.append(chunk_data)
 
-        return processed_sources
+        file.write_text(json.dumps(chunk_list))
 
-    def index_and_save(self, sources: List[Dict[str, Any]],
-                       save_path: str = "data/processed") -> None:
+    def index_to_file(self, chunks: List[Document],
+                      save_path: str = "data/processed") -> None:
         stemmer = Stemmer.Stemmer("english")
-        corpus = [src["content"] for src in sources]
+        sources = [c.page_content for c in chunks]
         corpus_tokens = bm25s.tokenize(
-            corpus, stopwords="en", stemmer=stemmer
+            sources, stopwords="en", stemmer=stemmer
         )
-        retriever = bm25s.BM25(corpus=sources)
+        retriever = bm25s.BM25(corpus=chunks)
         retriever.index(corpus_tokens)
-        retriever.save(INDEX_PATH, corpus=sources)
 
-
-INDEX_PATH = "data/processed/bm25_index"
-PATH_TO_PROCESS = "data/raw"
+        json_sources = [doc.model_dump() for doc in chunks]
+        retriever.save(INDEX_PATH, corpus=json_sources)
 
 
 class RagInterface:
     def index(self, max_chunk_size: int = 2000) -> None:
         indexer = Indexer(PATH_TO_PROCESS)
+
         chunks = indexer.chunkify(["python", "markdown"], max_chunk_size)
-        sources = indexer.process_chunks(chunks)
-        indexer.index_and_save(sources, INDEX_PATH)
+        indexer.save_chunks(chunks, CHUNK_PATH)
+
+        indexer.index_to_file(chunks, INDEX_PATH)
+        print(f"Ingestion complete! Indices saved under {INDEX_PATH}")
 
     def search(self, query: str, k: int = 10) -> None:
         try:
