@@ -1,0 +1,9 @@
+from _typeshed import Incomplete
+from collections.abc import Callable
+
+RetryOn = tuple[type[Exception], ...] | Callable[[Exception], bool]
+OnFailure: Incomplete
+
+def validate_retry_params(max_retries: int, initial_delay: float, max_delay: float, backoff_factor: float) -> None: ...
+def should_retry_exception(exc: Exception, retry_on: RetryOn) -> bool: ...
+def calculate_delay(retry_number: int, *, backoff_factor: float, initial_delay: float, max_delay: float, jitter: bool) -> float: ...
