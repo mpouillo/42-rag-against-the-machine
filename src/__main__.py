@@ -2,28 +2,41 @@
 
 import fire
 import json
+import bm25s
+import sys
+import Stemmer
 from pathlib import Path
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter, Language
 from langchain_core.documents import Document
-from .models import MinimalSource
+from .models import MinimalSource, MinimalSearchResults, StudentSearchResults
+from typing import List, Dict, Any
 
 
-class Chunker:
-    def process(self, max_chunk_size: int = 2000):
-        path = Path("data/raw")
+class Indexer:
+    def __init__(self, path_to_process: str) -> None:
+        self.path_to_process = path_to_process
+        self.chunked_sources = []
 
+    def chunkify(self, language: str,
+                 max_chunk_size: int = 2000) -> List[Document]:
+        input_path = Path(self.path_to_process)
         filenames = []
         docs = []
-        sources = []
 
-        for filename in path.rglob('*'):
+        match language:
+            case "python":
+                lang = Language.PYTHON
+            case _:
+                lang = Language.MARKDOWN
+
+        for filename in input_path.rglob('*'):
             if filename.is_file() and filename.suffix == '.py':
                 filenames.append(filename)
 
         text_splitter = RecursiveCharacterTextSplitter.from_language(
-            language="python",
+            language=lang,
             chunk_size=max_chunk_size,
-            chunk_overlap=0,
+            chunk_overlap=0,    # maybe more?
             add_start_index=True,
             keep_separator=True
         )
@@ -31,46 +44,96 @@ class Chunker:
         for file in filenames:
             docs.append(
                 Document(page_content=file.read_text(),
-                         metadata={"source": str(file)})
+                         metadata={"path": str(file)})
             )
 
-        for chunk in text_splitter.split_documents(docs):
-            file_path = chunk.metadata.get("source")
-            start_index = chunk.metadata.get("start_index")
+        return text_splitter.split_documents(docs)
+
+    def process_chunks(self, chunks: list[Document]) -> List[Dict[str, Any]]:
+        processed_sources = []
+
+        for chunk in chunks:
+            file_path = chunk.metadata.get("path", "")
+            start_index = chunk.metadata.get("start_index", 0)
             end_index = start_index + len(chunk.page_content)
 
-            chunk = {
+            source_data = {
                     "file_path": file_path,
                     "first_character_index": start_index,
                     "last_character_index": end_index
                 }
 
-            MinimalSource(**chunk)
-            sources.append(chunk)
+            source = {
+                "source": MinimalSource(**source_data).model_dump_json(),
+                "content": chunk.page_content
+            }
 
-        return sources
+            processed_sources.append(source)
+
+        return processed_sources
+
+    def index_and_save(self, sources: List[Dict[str, Any]],
+                       save_path: str = "data/processed") -> None:
+        stemmer = Stemmer.Stemmer("english")
+        corpus = [src["content"] for src in sources]
+        corpus_tokens = bm25s.tokenize(
+            corpus, stopwords="en", stemmer=stemmer
+        )
+        retriever = bm25s.BM25(corpus=sources)
+        retriever.index(corpus_tokens)
+        retriever.save(INDEX_PATH, corpus=sources)
+
+
+INDEX_PATH = "data/processed/bm25_index"
+PATH_TO_PROCESS = "data/raw"
 
 
 class RagInterface:
     def index(self, max_chunk_size: int = 2000) -> None:
-        sources = Chunker.process(max_chunk_size)
-        file = Path("data/sources.json")
-        file.write_text(json.dumps(sources, indent=4))
+        indexer = Indexer(PATH_TO_PROCESS)
+        chunks = indexer.chunkify(["python", "markdown"], max_chunk_size)
+        sources = indexer.process_chunks(chunks)
+        indexer.index_and_save(sources, INDEX_PATH)
 
-    def search(self) -> None:
-        print("test")
+    def search(self, query: str, k: int = 10) -> None:
+        try:
+            retriever = bm25s.BM25.load(INDEX_PATH, load_corpus=True)
+        except Exception:
+            sys.exit("Error: no index found")
+
+        stemmer = Stemmer.Stemmer("english")
+        query_tokens = bm25s.tokenize(query, stemmer=stemmer)
+        results, scores = retriever.retrieve(query_tokens, k=k)
+
+        retrieved_sources = []
+        for i in range(results.shape[1]):
+            doc, score = results[0, i], scores[0, i] # noqa
+            retrieved_sources.append(doc.get("source"))
+
+        result = MinimalSearchResults(
+            question_id="q1",
+            question=query,
+            retrieved_sources=[
+                MinimalSource(**json.loads(r)) for r in retrieved_sources
+            ]
+        )
+
+        search_results = StudentSearchResults(search_results=[result], k=k)
+
+        output = Path("data/output.json")
+        output.write_text(json.dumps(search_results.model_dump(), indent=4))
 
     def search_dataset(self) -> None:
-        print("test")
+        pass
 
-    def answer(self) -> None:
-        print("test")
+    def answer(self, query: str, k: int = 10) -> None:
+        pass
 
     def answer_dataset(self) -> None:
-        print("test")
+        pass
 
     def evaluate(self) -> None:
-        print("test")
+        pass
 
 
 def main() -> None:
