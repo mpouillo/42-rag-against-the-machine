@@ -42,7 +42,11 @@ start-server:
 	@curl http://localhost:11434 >/dev/null 2>&1; \
 	if [ $$? -ne 0 ]; then \
 		echo "Starting ollama server..."; \
-		gnome-terminal -- bash -c "ollama serve; exec bash"; \
+		gnome-terminal -- bash -c "\
+			export OLLAMA_NUM_PARALLEL=\$$(cat /sys/devices/system/cpu/cpu*/topology/core_id | sort -u | wc -l); \
+			export OLLAMA_FLASH_ATTENTION=1; \
+			ollama serve; \
+			exec bash"; \
 	fi
 
 run: start-server

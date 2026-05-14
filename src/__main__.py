@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import asyncio
 import fire
 import sys
 
@@ -51,7 +52,7 @@ class RagInterface(object):
                        save_directory: str) -> None:
         llm = LLMInterface("llama3.2:1b")
         dataset = llm.load_dataset(student_search_results_path)
-        answers = llm.answer_dataset(dataset)
+        answers = asyncio.run(llm.answer_dataset(dataset))
         llm.save_answers(answers, save_directory)
 
         print(f"Saved student_search_results_and_answer to {save_directory}")

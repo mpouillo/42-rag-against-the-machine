@@ -1,3 +1,4 @@
+import asyncio
 import json
 import ollama
 
@@ -13,6 +14,8 @@ from .models import (
 class LLMInterface:
     def __init__(self, llm: str = "qwen3:0.6b") -> None:
         self.llm = llm
+        self.client = ollama.AsyncClient()
+        self._file_cache = {}
 
         if llm not in [m.model for m in ollama.list().models]:
             print(f"Installing model '{llm}'...")
@@ -26,23 +29,17 @@ class LLMInterface:
 
     def retrieve_source(self, file_path: str, first_character_index: int,
                         last_character_index: int) -> str:
-        file = Path(file_path)
-        return file.read_text()[first_character_index:last_character_index]
+        if file_path not in self._file_cache:
+            self._file_cache[file_path] = Path(file_path).read_text()
+        text = self._file_cache[file_path]
+        return text[first_character_index:last_character_index]
 
-    def answer(self, query: str, context: str,
-               print_result: bool = False) -> str:
+    async def answer(self, query: str, context: str,
+                     print_result: bool = False) -> str:
         response = ollama.chat(
             model=self.llm,
-            messages=[
-                {
-                    "role": "system",
-                    "content": context
-                },
-                {
-                    "role": "user",
-                    "content": query
-                }
-            ]
+            messages=[{"role": "context", "content": context},
+                      {"role": "user", "content": query}]
         )
 
         if print_result:
@@ -50,12 +47,10 @@ class LLMInterface:
 
         return response.message.content
 
-    def answer_dataset(self, dataset: StudentSearchResults) \
+    async def answer_dataset(self, dataset: StudentSearchResults) \
             -> StudentSearchResultsAndAnswer:
-        answers = []
-        for entry in dataset.search_results:
-            query = entry.question
 
+        async def process_entry(entry):
             sources = [
                 self.retrieve_source(
                     source.file_path,
@@ -64,17 +59,28 @@ class LLMInterface:
                 for source in entry.retrieved_sources
             ]
 
-            context = "\n\n===== SOURCE SEPARATOR =====\n\n".join(sources)
+            context = "\n\n\n".join(sources)
+            response = await self.client.chat(
+                model=self.llm,
+                messages=[{"role": "system", "content": "Keep your answers as short as possible while responding accurately."},
+                          {"role": "context", "content": context},
+                          {"role": "user", "content": entry.question}],
+                options={
+                    "temperature": 0.1,
+                    "keep_alive": -1,
+                    "num_ctx": 2048
+                }
+            )
 
-            answer = self.answer(query, context)
+            return MinimalAnswer(
+                **entry.model_dump(), answer=response.message.content
+            )
 
-            answers.append(MinimalAnswer(**entry.model_dump(), answer=answer))
-
-        output = StudentSearchResultsAndAnswer(
+        tasks = [process_entry(entry) for entry in dataset.search_results[:10]]
+        answers = await asyncio.gather(*tasks)
+        return StudentSearchResultsAndAnswer(
             search_results=answers, k=dataset.k
         )
-
-        return output
 
     def save_answers(self, answers: StudentSearchResults,
                      save_directory: str) -> None:
