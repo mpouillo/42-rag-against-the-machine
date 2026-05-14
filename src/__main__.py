@@ -3,9 +3,12 @@
 import fire
 import sys
 
+from pathlib import Path
+
 from .indexer import Indexer
 from .searcher import Searcher
 from .llm_interface import LLMInterface
+from .models import StudentSearchResults
 
 
 class RagInterface(object):
@@ -27,7 +30,9 @@ class RagInterface(object):
 
     def search(self, query: str, k: int = 10) -> None:
         searcher = Searcher(self.index_path)
-        searcher.search(query, k, print_result=True)
+        result = searcher.search(query, k, print_result=True)
+        output = StudentSearchResults(search_results=[result], k=k)
+        searcher.save_search_results(output, "data/output/search_result.json")
 
     def search_dataset(self, dataset_path: str,
                        save_directory: str, k: int = 10) -> None:
@@ -37,19 +42,17 @@ class RagInterface(object):
         searcher.save_search_results(results, save_directory)
         print(f"Saved student_search_results to {save_directory}")
 
-    def answer(self, query: str) -> None:
+    def answer(self, query: str, path_to_context: str) -> None:
         llm = LLMInterface()
-        print(llm.answer(query))
+        context = Path(path_to_context)
+        llm.answer(query, context.read_text(), print_result=True)
 
     def answer_dataset(self, student_search_results_path: str,
                        save_directory: str) -> None:
-        llm = LLMInterface()
-        dataset = llm.load_dataset()
-        print(f"Loaded {len(dataset)} questions "
-              f"from {student_search_results_path}")
-
-        answers = llm.answer_dataset()
-        print(f"Processed {len(answers)} of {len(dataset)} questions")
+        llm = LLMInterface("llama3.2:1b")
+        dataset = llm.load_dataset(student_search_results_path)
+        answers = llm.answer_dataset(dataset)
+        llm.save_answers(answers, save_directory)
 
         print(f"Saved student_search_results_and_answer to {save_directory}")
 
