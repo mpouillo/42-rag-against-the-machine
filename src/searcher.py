@@ -9,6 +9,7 @@ from typing import List
 from .models import (
     MinimalSource,
     MinimalSearchResults,
+    RagDataset,
     StudentSearchResults,
     UnansweredQuestion
 )
@@ -22,7 +23,7 @@ class Searcher:
             sys.exit("no index or chunks found")
 
     def search(self, query: str, k: int,
-               print_result: bool = False) -> StudentSearchResults:
+               print_result: bool = False) -> MinimalSearchResults:
         question = UnansweredQuestion(question=query)
 
         stemmer = Stemmer.Stemmer("english")
@@ -40,27 +41,24 @@ class Searcher:
             retrieved_sources=retrieved_sources
         )
 
-        output = StudentSearchResults(search_results=[result], k=k)
-
         if print_result:
-            print(json.dumps(output.model_dump(), indent=4))
+            print(json.dumps(result.model_dump(), indent=4))
 
-        return output
+        return result
 
     def search_dataset(self, dataset_path: str,
                        k: int) -> List[StudentSearchResults]:
         dataset_file = Path(dataset_path)
-        dataset = json.loads(dataset_file.read_text())
+        dataset_json = json.loads(dataset_file.read_text())
+        dataset = RagDataset(**dataset_json)
+        results = [self.search(d.question, k) for d in dataset.rag_questions]
 
-        return [self.search(data["question"], k)
-                for data in dataset["rag_questions"]]
+        return StudentSearchResults(search_results=results, k=k)
 
     def save_search_results(self,
-                            search_results: List[StudentSearchResults],
+                            search_results: StudentSearchResults,
                             save_directory: str) -> None:
         save_file = Path(save_directory)
         save_file.parent.mkdir(parents=True, exist_ok=True)
-        json_obj = {
-            "rag_questions": [obj.model_dump() for obj in search_results]
-        }
-        save_file.write_text(json.dumps(json_obj, indent=4))
+        results_json = search_results.model_dump()
+        save_file.write_text(json.dumps(results_json, indent=4))

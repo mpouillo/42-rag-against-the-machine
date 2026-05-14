@@ -18,6 +18,11 @@ class Indexer:
     def chunkify(self, language: str,
                  max_chunk_size: int = 2000) -> List[Document]:
         input_path = Path(self.path_to_process)
+        if not input_path.is_dir():
+            raise ValueError("input directory not found")
+        if not input_path.rglob('*'):
+            raise ValueError("no files to ingest")
+
         filenames = []
         docs = []
         chunks = []
@@ -25,11 +30,13 @@ class Indexer:
         match language:
             case "python":
                 lang = Language.PYTHON
+                suffix = ".py"
             case _:
                 lang = Language.MARKDOWN
+                suffix = ".md"
 
         for filename in input_path.rglob('*'):
-            if filename.is_file() and filename.suffix == '.py':
+            if filename.is_file() and filename.suffix == suffix:
                 filenames.append(filename)
 
         text_splitter = RecursiveCharacterTextSplitter.from_language(
