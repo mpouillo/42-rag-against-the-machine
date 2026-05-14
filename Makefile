@@ -32,11 +32,22 @@ install:
 		curl -LsSf https://astral.sh/uv/install.sh | sh >/dev/null 2>&1; \
 	fi
 	@$(UV) add $(DEPS)
+	@$(MAKE) sync --no-print-directory
+
+sync:
 	@echo "Syncing dependencies..."
 	@$(UV) sync
 
-run:
+start-server:
+	@curl http://localhost:11434 >/dev/null 2>&1; \
+	if [ $$? -ne 0 ]; then \
+		echo "Starting ollama server..."; \
+		gnome-terminal -- bash -c "ollama serve; exec bash"; \
+	fi
+
+run: start-server
 	@$(UV) run python -m $(SRC)
+
 
 debug:
 	@$(UV) run python -m pudb -m $(SRC)
@@ -68,5 +79,5 @@ fclean: clean
 
 re: fclean all
 
-.PHONY: all install run debug lint lint-strict clean fclean re
+.PHONY: all install run debug lint lint-strict clean fclean re sync start-server
 .DEFAULT_GOAL = all
