@@ -23,10 +23,6 @@ class Indexer:
         if not input_path.rglob('*'):
             raise ValueError("no files to ingest")
 
-        filenames = []
-        docs = []
-        chunks = []
-
         match language:
             case "python":
                 lang = Language.PYTHON
@@ -35,26 +31,26 @@ class Indexer:
                 lang = Language.MARKDOWN
                 suffix = ".md"
 
-        for filename in input_path.rglob('*'):
-            if filename.is_file() and filename.suffix == suffix:
-                filenames.append(filename)
+        # Parse files into documents
+        docs = [
+            Document(page_content=file.read_text(),
+                     metadata={"path": str(file)})
+            for file in input_path.rglob(f'*{suffix}') if file.is_file()
+        ]
 
         text_splitter = RecursiveCharacterTextSplitter.from_language(
             language=lang,
             chunk_size=max_chunk_size,
-            chunk_overlap=0,    # maybe more?
+            chunk_overlap=max(150, max_chunk_size // 5),
             add_start_index=True,
             keep_separator=True
         )
 
-        for file in filenames:
-            docs.append(
-                Document(page_content=file.read_text(),
-                         metadata={"path": str(file)})
-            )
-
+        # Split documents
         split_docs = text_splitter.split_documents(docs)
 
+        # Create minimal sources from split documents
+        chunks = []
         for doc in split_docs:
             file_path = doc.metadata.get("path", "")
             start_index = doc.metadata.get("start_index", 0)

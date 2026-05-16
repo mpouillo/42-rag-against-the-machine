@@ -1,9 +1,10 @@
-import asyncio
 import json
 import ollama
 
 from pathlib import Path
+from tqdm.asyncio import tqdm_asyncio
 
+from .constants import SYSTEM_PROMPT
 from .models import (
     MinimalAnswer,
     StudentSearchResults,
@@ -62,13 +63,15 @@ class LLMInterface:
             context = "\n\n\n".join(sources)
             response = await self.client.chat(
                 model=self.llm,
-                messages=[{"role": "system", "content": "Keep your answers as short as possible while responding accurately."},
-                          {"role": "context", "content": context},
-                          {"role": "user", "content": entry.question}],
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": f"Reference Text:\n{context}"
+                     f"\n\nQuestion: {entry.question}"}
+                ],
                 options={
-                    "temperature": 0.1,
                     "keep_alive": -1,
-                    "num_ctx": 2048
+                    "num_ctx": 512,
+                    "temperature": 0.1,
                 }
             )
 
@@ -76,8 +79,9 @@ class LLMInterface:
                 **entry.model_dump(), answer=response.message.content
             )
 
-        tasks = [process_entry(entry) for entry in dataset.search_results[:10]]
-        answers = await asyncio.gather(*tasks)
+        tasks = [process_entry(entry) for entry in dataset.search_results]
+        answers = await tqdm_asyncio.gather(*tasks,
+                                            desc="Processing queries...")
         return StudentSearchResultsAndAnswer(
             search_results=answers, k=dataset.k
         )

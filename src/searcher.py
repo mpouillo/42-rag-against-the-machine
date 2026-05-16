@@ -4,6 +4,7 @@ import Stemmer
 import sys
 
 from pathlib import Path
+from tqdm import tqdm
 from typing import List
 
 from .models import (
@@ -51,7 +52,10 @@ class Searcher:
         dataset_file = Path(dataset_path)
         dataset_json = json.loads(dataset_file.read_text())
         dataset = RagDataset(**dataset_json)
-        results = [self.search(d.question, k) for d in dataset.rag_questions]
+
+        results = []
+        for d in tqdm(dataset.rag_questions):
+            results.append(self.search(d.question, k))
 
         return StudentSearchResults(search_results=results, k=k)
 
