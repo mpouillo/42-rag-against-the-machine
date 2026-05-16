@@ -56,9 +56,9 @@ stop-server:
 
 test: start-server
 	@echo "Testing index..."
-	@$(UV) run python -m $(SRC) index --max_chunk_size=500
+	@$(UV) run python -m $(SRC) index --max_chunk_size=2000
 	@echo "Testing search..."
-	@$(UV) run python -m $(SRC) search_dataset --dataset_path data/datasets_public/public/UnansweredQuestions/dataset_docs_public.json --k 5 --save_directory data/output/search_results.json
+	@$(UV) run python -m $(SRC) search_dataset --dataset_path data/datasets_public/public/UnansweredQuestions/dataset_docs_public.json --k 10 --save_directory data/output/search_results.json
 	@echo "Testing answer..."
 	@$(UV) run python -m $(SRC) answer_dataset --student_search_results_path data/output/search_results.json --save_directory data/output/search_results_and_answer.json
 
