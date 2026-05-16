@@ -13,7 +13,7 @@ from .models import (
 )
 
 
-class LLMInterface:
+class Answerer:
     def __init__(self, llm: str = "qwen3:0.6b") -> None:
         self.llm = llm
         self.client = ollama.AsyncClient()

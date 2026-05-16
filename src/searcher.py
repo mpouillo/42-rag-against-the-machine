@@ -23,8 +23,7 @@ class Searcher:
         except Exception:
             sys.exit("no index or chunks found")
 
-    def search(self, query: str, k: int,
-               print_result: bool = False) -> MinimalSearchResults:
+    def search(self, query: str, k: int) -> MinimalSearchResults:
         question = UnansweredQuestion(question=query)
 
         stemmer = Stemmer.Stemmer("english")
@@ -41,9 +40,6 @@ class Searcher:
             question=query,
             retrieved_sources=retrieved_sources
         )
-
-        if print_result:
-            print(json.dumps(result.model_dump(), indent=4))
 
         return result
 

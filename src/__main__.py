@@ -2,62 +2,58 @@
 
 import asyncio
 import fire
+import json
 import sys
 
+from .constants import (
+    CHUNK_FILEPATH,
+    INDEX_PATH,
+    PATH_TO_INGEST,
+    SEARCH_SAVE_FILEPATH
+)
 from .indexer import Indexer
 from .searcher import Searcher
-from .llm_interface import LLMInterface
-from .models import StudentSearchResults
+from .llm_interface import Answerer
 
 
 class RagInterface(object):
-    def __init__(self):
-        self.index_path = "data/processed/bm25_index"
-        self.chunk_filepath = "data/processed/chunks/chunks.json"
-        self.path_to_process = "data/raw"
-
     def index(self, max_chunk_size: int = 2000) -> None:
-        indexer = Indexer(self.path_to_process)
-        chunks = (
-            indexer.chunkify("markdown", max_chunk_size)
-            + indexer.chunkify("python", max_chunk_size)
-        )
-        indexer.save_chunks(chunks, self.chunk_filepath)
+        indexer = Indexer(PATH_TO_INGEST)
+        chunks = (indexer.chunkify("markdown", max_chunk_size)
+                  + indexer.chunkify("python", max_chunk_size))
+        indexer.save_chunks(chunks, CHUNK_FILEPATH)
+        indexer.create_index(chunks, INDEX_PATH)
+        print(f"Ingestion complete! Indices saved under {INDEX_PATH}")
 
-        indexer.create_index(chunks, self.index_path)
-        print(f"Ingestion complete! Indices saved under {self.index_path}")
+    def search(self, query: str, k: int = 10) -> str:
+        searcher = Searcher(INDEX_PATH)
+        results = searcher.search(query, k)
+        print(json.dumps(results.model_dump(), indent=4))
+        return results.model_dump_json()
 
-    def search(self, query: str, k: int = 10) -> None:
-        searcher = Searcher(self.index_path)
-        result = searcher.search(query, k, print_result=True)
-        output = StudentSearchResults(search_results=[result], k=k)
-        searcher.save_search_results(output, "data/output/search_result.json")
-
-    def search_dataset(self, dataset_path: str,
-                       save_directory: str, k: int = 10) -> None:
-        searcher = Searcher(self.index_path)
+    def search_dataset(self, dataset_path: str, k: int = 10,
+                       save_directory: str = SEARCH_SAVE_FILEPATH) -> None:
+        searcher = Searcher(INDEX_PATH)
         results = searcher.search_dataset(dataset_path, k)
-
         searcher.save_search_results(results, save_directory)
         print(f"Saved student_search_results to {save_directory}")
 
-    def answer(self, student_search_results_path: str,
-               save_directory: str) -> None:
-        llm = LLMInterface()
-        dataset = llm.load_dataset(student_search_results_path)
-        answers = asyncio.run(llm.answer_dataset(dataset))
-        llm.save_answers(answers, save_directory)
+    def answer(self, query: str, k: int = 10) -> str:
+        results = Searcher(INDEX_PATH).search(query, k)
+        answers = Answerer().answer_dataset(results)
+        print(json.dumps(answers.model_dump(), indent=4))
+        return answers.model_dump_json()
 
     def answer_dataset(self, student_search_results_path: str,
                        save_directory: str) -> None:
-        llm = LLMInterface()
-        dataset = llm.load_dataset(student_search_results_path)
-        answers = asyncio.run(llm.answer_dataset(dataset))
-        llm.save_answers(answers, save_directory)
-
+        answerer = Answerer()
+        dataset = answerer.load_dataset(student_search_results_path)
+        answers = asyncio.run(answerer.answer_dataset(dataset))
+        answerer.save_answers(answers, save_directory)
         print(f"Saved student_search_results_and_answer to {save_directory}")
 
-    def evaluate(self) -> None:
+    def evaluate(self, student_answer_path: str, dataset_path: str,
+                 k: int, max_context_length: int) -> None:
         pass
 
 
