@@ -4,9 +4,10 @@ import ollama
 from pathlib import Path
 from tqdm.asyncio import tqdm_asyncio
 
-from .constants import SYSTEM_PROMPT
+from .constants import LLM_NUM_PREDICT, LLM_TEMPERATURE, SYSTEM_PROMPT
 from .models import (
     MinimalAnswer,
+    MinimalSource,
     StudentSearchResults,
     StudentSearchResultsAndAnswer
 )
@@ -35,23 +36,17 @@ class LLMInterface:
         text = self._file_cache[file_path]
         return text[first_character_index:last_character_index]
 
-    async def answer(self, query: str, context: str,
-                     print_result: bool = False) -> str:
-        response = ollama.chat(
-            model=self.llm,
-            messages=[{"role": "context", "content": context},
-                      {"role": "user", "content": query}]
-        )
-
-        if print_result:
-            print(response.message.content)
-
-        return response.message.content
+    def calculate_ctx(self, query: str, k: int, max_chunk_size: int) -> int:
+        context = int((k * max_chunk_size) / 3.5)
+        sys_prompt = int(len(SYSTEM_PROMPT) / 3.5)
+        user_query = int(len(query) / 3.5)
+        total_tokens = context + sys_prompt + user_query + LLM_NUM_PREDICT
+        return max(2048, 1 << (total_tokens - 1).bit_length())
 
     async def answer_dataset(self, dataset: StudentSearchResults) \
             -> StudentSearchResultsAndAnswer:
 
-        async def process_entry(entry):
+        async def process_entry(entry: MinimalSource) -> MinimalAnswer:
             sources = [
                 self.retrieve_source(
                     source.file_path,
@@ -61,17 +56,23 @@ class LLMInterface:
             ]
 
             context = "\n\n\n".join(sources)
+            ctx_size = self.calculate_ctx(entry.question, dataset.k, max(
+                [source.last_character_index - source.first_character_index
+                 for source in entry.retrieved_sources]
+            ))
+
             response = await self.client.chat(
                 model=self.llm,
                 messages=[
                     {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": f"Reference Text:\n{context}"
+                    {"role": "user", "content": f"Context:\n{context}"
                      f"\n\nQuestion: {entry.question}"}
                 ],
                 options={
                     "keep_alive": -1,
-                    "num_ctx": 512,
-                    "temperature": 0.1,
+                    "temperature": LLM_TEMPERATURE,
+                    "num_ctx": ctx_size,
+                    "num_predict": LLM_NUM_PREDICT
                 }
             )
 
@@ -80,8 +81,7 @@ class LLMInterface:
             )
 
         tasks = [process_entry(entry) for entry in dataset.search_results]
-        answers = await tqdm_asyncio.gather(*tasks,
-                                            desc="Processing queries...")
+        answers = await tqdm_asyncio.gather(*tasks, desc="Processing...")
         return StudentSearchResultsAndAnswer(
             search_results=answers, k=dataset.k
         )

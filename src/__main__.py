@@ -4,8 +4,6 @@ import asyncio
 import fire
 import sys
 
-from pathlib import Path
-
 from .indexer import Indexer
 from .searcher import Searcher
 from .llm_interface import LLMInterface
@@ -43,14 +41,16 @@ class RagInterface(object):
         searcher.save_search_results(results, save_directory)
         print(f"Saved student_search_results to {save_directory}")
 
-    def answer(self, query: str, path_to_context: str) -> None:
+    def answer(self, student_search_results_path: str,
+               save_directory: str) -> None:
         llm = LLMInterface()
-        context = Path(path_to_context)
-        llm.answer(query, context.read_text(), print_result=True)
+        dataset = llm.load_dataset(student_search_results_path)
+        answers = asyncio.run(llm.answer_dataset(dataset))
+        llm.save_answers(answers, save_directory)
 
     def answer_dataset(self, student_search_results_path: str,
                        save_directory: str) -> None:
-        llm = LLMInterface("llama3.2:1b")
+        llm = LLMInterface()
         dataset = llm.load_dataset(student_search_results_path)
         answers = asyncio.run(llm.answer_dataset(dataset))
         llm.save_answers(answers, save_directory)
