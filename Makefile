@@ -39,18 +39,25 @@ sync:
 	@$(UV) sync
 
 start-server:
-	@curl http://localhost:11434 >/dev/null 2>&1; \
+	@curl -s http://localhost:11434 >/dev/null 2>&1; \
 	if [ $$? -ne 0 ]; then \
 		echo "Starting ollama server..."; \
-		gnome-terminal -- bash -c "\
-			export OLLAMA_NUM_PARALLEL=\$$(cat /sys/devices/system/cpu/cpu*/topology/core_id | sort -u | wc -l); \
-			export OLLAMA_FLASH_ATTENTION=1; \
-			ollama serve; \
-			exec bash"; \
+		export OLLAMA_NUM_PARALLEL=$$(cat /sys/devices/system/cpu/cpu*/topology/core_id | sort -u | wc -l); \
+		export OLLAMA_FLASH_ATTENTION=1; \
+		ollama serve > /dev/null 2>&1 & \
+		until curl -s http://localhost:11434 >/dev/null 2>&1; do sleep 1; done; \
 	fi
 
-run: start-server
-	@$(UV) run python -m $(SRC)
+stop-server:
+	@curl -s http://localhost:11434 >/dev/null 2>&1; \
+	if [ $$? -ne 0 ]; then \
+		pkill ollama
+	fi
+
+test: start-server
+	$(UV) run python -m $(SRC) index --max_chunk_size=2000
+	$(UV) run python -m $(SRC) search_dataset --dataset_path data/datasets_public/public/UnansweredQuestions/dataset_docs_public.json --k 10 --save_directory data/output/search_results.json
+	$(UV) run python -m $(SRC) answer_dataset --student_search_results_path data/output/search_results.json --save_directory data/output/search_results_and_answer.json
 
 
 debug:
@@ -83,5 +90,5 @@ fclean: clean
 
 re: fclean all
 
-.PHONY: all install run debug lint lint-strict clean fclean re sync start-server
+.PHONY: all install test debug lint lint-strict clean fclean re sync start-server
 .DEFAULT_GOAL = all
