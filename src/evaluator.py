@@ -17,28 +17,35 @@ QList: TypeAlias = List[UnansweredQuestion | AnsweredQuestion]
 
 
 class Evaluator:
-    def __init__(self, student_path: str, correct_path: str) -> None:
+    def __init__(
+        self,
+        student_path: str,
+        correct_path: str
+    ) -> None:
         self.student_path = student_path
         self.correct_path = correct_path
 
-    def load_dataset(self, dataset_path: str) -> RagDataset:
+    def load_dataset(
+        self,
+        dataset_path: str
+    ) -> RagDataset:
         dataset_file = Path(dataset_path)
         dataset_json = json.loads(dataset_file.read_text())
         return RagDataset(**dataset_json)
 
-    def load_student(self, answers_path: str) -> StudentSearchResults:
+    def load_student(
+        self,
+        answers_path: str
+    ) -> StudentSearchResults:
         dataset_file = Path(answers_path)
         dataset_json = json.loads(dataset_file.read_text())
         return StudentSearchResults(**dataset_json)
 
-    def count_questions(self, dataset: List, sources: bool = False) -> int:
-        questions = {q.question_id for q in dataset if hasattr(q, "sources")}
-        if not sources:
-            questions = {q.question_id for q in dataset}
-        return len(questions)
-
-    def validate_context_length(self, dataset: List[MinimalSearchResults],
-                                length: int) -> bool:
+    def validate_context_length(
+        self,
+        dataset: List[MinimalSearchResults],
+        length: int
+    ) -> bool:
         for entry in dataset:
             for source in entry.retrieved_sources:
                 if not (source.last_character_index
@@ -46,7 +53,10 @@ class Evaluator:
                     return False
         return True
 
-    def validate(self, max_context_length: int) -> None:
+    def validate(
+        self,
+        max_context_length: int
+    ) -> None:
         student = self.load_student(self.student_path).search_results
         correct = self.load_dataset(self.correct_path).rag_questions
 
@@ -60,80 +70,84 @@ class Evaluator:
         print("Total number of questions with sources:", c2)
         print("Total number of questions with student sources:", c3)
 
-    def count_evaluated(self) -> int:
+    def count_evaluated(
+        self
+    ) -> int:
         student = self.load_student(self.student_path).search_results
         correct = self.load_dataset(self.correct_path).rag_questions
         count = 0
 
         for entry in student:
-            # Skip unanswered questions
-            if not entry.retrieved_sources:
-                continue
-
-            # Find matching entry in validation dataset
-            truth = next((q for q in correct
-                          if q.question_id == entry.question_id), None)
-
-            # Skip if not matching entry found in validation dataset
-            if not truth or not truth.sources:
-                continue
-
-            count += 1
-
+            truth = next((q for q in correct if q.question_id == entry.question_id), None)
+            if truth and getattr(truth, "sources", None):
+                count += 1
         return count
 
-    def is_source_found(self, source: MinimalSource,
-                        truth_sources: MinimalSource) -> bool:
-        for truth in truth_sources.sources:
-            start_inter = max(source.first_character_index,
-                              truth.first_character_index)
-            end_inter = min(source.last_character_index,
-                            truth.last_character_index)
+    def is_source_found(
+        self,
+        source: MinimalSource,
+        truth_source: MinimalSource
+    ) -> bool:
+        if getattr(source, 'file_path', None) != getattr(truth_source, 'file_path', None):
+            return False
 
-            intersection = max(0, end_inter - start_inter)
-            if intersection == 0:
-                continue
+        start_inter = max(source.first_character_index, truth_source.first_character_index)
+        end_inter = min(source.last_character_index, truth_source.last_character_index)
 
-            len_truth = (truth.last_character_index
-                         - truth.first_character_index)
-            if len_truth == 0:
-                continue
+        intersection = max(0, end_inter - start_inter)
+        if intersection == 0:
+            return False
 
-            ratio = intersection / len_truth
-            if ratio > RECALL_THRESHOLD:
-                return True
-        return False
+        len_truth = truth_source.last_character_index - truth_source.first_character_index
+        if len_truth == 0:
+            return False
 
-    def recallat(self, k: int) -> int:
+        ratio = intersection / len_truth
+        return ratio > RECALL_THRESHOLD
+
+    def recallat(
+        self,
+        k: int
+    ) -> float:
         student = self.load_student(self.student_path).search_results
         correct = self.load_dataset(self.correct_path).rag_questions
+
         if not correct:
-            return 1
+            return 1.0
+
         scores = []
+        truth_checked = 0
 
         for entry in student:
-            # Skip unanswered questions
-            if not entry.retrieved_sources:
-                continue
+            truth = next(
+                (q for q in correct
+                if q.question_id == entry.question_id), None
+            )
 
-            # Find matching entry in validation dataset
-            truth = next((q for q in correct
-                          if q.question_id == entry.question_id), None)
-
-            # Skip if not matching entry found in validation dataset
             if not truth or not truth.sources:
                 continue
 
-            found_sources = 0
-            for src in entry.retrieved_sources[:k]:
-                if self.is_source_found(src, truth):
-                    found_sources += 1
+            truth_checked += 1
 
-            scores.append(found_sources / len(truth.sources))
+            if not entry.retrieved_sources:
+                scores.append(0.0)
+                continue
 
-        return sum(scores) / len(correct) if scores else 0.0
+            unique_truth_found = set()
+            for t_idx, truth_src in enumerate(truth.sources):
+                for student_src in entry.retrieved_sources[:k]:
+                    if self.is_source_found(student_src, truth_src):
+                        unique_truth_found.add(t_idx)
+                        break
 
-    def evaluate(self, k: int) -> None:
+            scores.append(len(unique_truth_found) / len(truth.sources))
+
+        return sum(scores) / truth_checked if truth_checked > 0 else 0.0
+
+    def evaluate(
+        self,
+        k: int
+    ) -> None:
         count = self.count_evaluated()
         r1 = self.recallat(1)
         r3 = self.recallat(3)
@@ -143,7 +157,7 @@ class Evaluator:
         print("Evaluation Results")
         print("========================================")
         print("Questions evaluated:", count)
-        print(f"Recall@1: {r1:.3f}")
-        print(f"Recall@3: {r3:.3f}")
-        print(f"Recall@5: {r5:.3f}")
+        print(f"Recall@1:  {r1:.3f}")
+        print(f"Recall@3:  {r3:.3f}")
+        print(f"Recall@5:  {r5:.3f}")
         print(f"Recall@10: {r10:.3f}")

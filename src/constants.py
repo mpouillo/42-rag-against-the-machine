@@ -7,7 +7,9 @@ SEARCH_DIRECTORY = "data/output/search_results"
 
 # LLM
 LLM_TEMPERATURE = 0.1
-LLM_NUM_PREDICT = 500
+LLM_NUM_PREDICT = 999
+LLM_FAILURE_ANSWER="I'm sorry, but I couldn't find any relevant information \
+in the database to answer your question."
 LLM_SYSTEM_PROMPT = """
 You are a technical documentation assistant. Your job is to answer the \
 user's question directly and factually using the provided context.
@@ -23,5 +25,11 @@ provided in the context is your own permanent knowledge and explain it to the us
 5. Keep the response clear, precise, natural, and under 5 sentences.
 """
 
+# Reranker
+RERANKER_THRESHOLD = 0.5
+RERANKER_CACHE_DIR = "./opt"
+RERANKER_LLM_MODEL = "ms-marco-MiniLM-L-12-v2"
+# Faster: "ms-marco-TinyBERT-L-2-v2"
+
 # Recall@k
-RECALL_THRESHOLD = 5 / 100
+RECALL_THRESHOLD = 0.05

@@ -12,16 +12,16 @@ from .models import MinimalSource
 
 
 class Indexer:
-    def __init__(self, path_to_process: str) -> None:
-        self.path_to_process = path_to_process
-        self.chunks_filename = "chunks.json"
-
-    def chunkify(self, language: str,
-                 max_chunk_size: int = 2000) -> List[MinimalSource]:
-        input_path = Path(self.path_to_process)
-        if not input_path.is_dir():
+    @staticmethod
+    def chunkify(
+        dir_path: str,
+        language: str,
+        max_chunk_size: int = 2000
+    ) -> List[MinimalSource]:
+        path = Path(dir_path)
+        if not path.is_dir():
             raise ValueError("input directory not found")
-        if not input_path.rglob('*'):
+        if not path.rglob('*'):
             raise ValueError("no files to ingest")
 
         match language:
@@ -36,7 +36,7 @@ class Indexer:
         docs = [
             Document(page_content=file.read_text(),
                      metadata={"path": str(file)})
-            for file in input_path.rglob(f'*{suffix}') if file.is_file()
+            for file in path.rglob(f'*{suffix}') if file.is_file()
         ]
 
         text_splitter = RecursiveCharacterTextSplitter.from_language(
@@ -68,21 +68,10 @@ class Indexer:
         return chunks
 
     @staticmethod
-    def save_chunks(chunks: list[Document], path_to_save: str) -> None:
-        path = Path(path_to_save)
-        path.parent.mkdir(parents=True, exist_ok=True)
-
-        chunk_list = [chunk.model_dump() for chunk in chunks]
-        path.write_text(json.dumps(chunk_list, indent=4))
-
-    @staticmethod
-    def load_chunks(path_to_load: str) -> List[MinimalSource]:
-        path = Path(path_to_load)
-
-        return [MinimalSource(**obj) for obj in json.loads(path.read_text())]
-
-    def create_index(self, chunks: List[MinimalSource],
-                     save_path: str = "data/processed") -> None:
+    def create_index(
+        chunks: List[MinimalSource],
+        save_path: str = "data/processed"
+    ) -> None:
         bm25_path = Path(save_path) / BM25_DIRECTORY
         stemmer = Stemmer.Stemmer("english")
         text_srcs = []
@@ -104,3 +93,11 @@ class Indexer:
         json_chunks = [c.model_dump() for c in chunks]
 
         retriever.save(bm25_path, corpus=json_chunks)
+
+    @staticmethod
+    def save_chunks(path_to_save: str, chunks: list[Document]) -> None:
+        path = Path(path_to_save)
+        path.parent.mkdir(parents=True, exist_ok=True)
+
+        chunk_list = [chunk.model_dump() for chunk in chunks]
+        path.write_text(json.dumps(chunk_list, indent=4))

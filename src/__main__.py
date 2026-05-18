@@ -14,55 +14,86 @@ from .constants import (
 )
 from .evaluator import Evaluator
 from .indexer import Indexer
-from .models import UnansweredQuestion
+from .ioutils import IOUtils
+from .models import UnansweredQuestion, StudentSearchResults
 from .searcher import Searcher
 
 
 class RagInterface(object):
-    def index(self, max_chunk_size: int = 2000) -> None:
-        indexer = Indexer(INGEST_DIRECTORY)
-        chunks = (indexer.chunkify("markdown", max_chunk_size)
-                  + indexer.chunkify("python", max_chunk_size))
-        indexer.save_chunks(chunks, CHUNK_PATH)
-        indexer.create_index(chunks, INDEX_DIRECTORY)
+    def index(
+        self,
+        max_chunk_size: int = 2000
+    ) -> None:
+        chunks = (
+            Indexer.chunkify(INGEST_DIRECTORY, "markdown", max_chunk_size)
+            + Indexer.chunkify(INGEST_DIRECTORY, "python", max_chunk_size)
+        )
+        Indexer.save_chunks(CHUNK_PATH, chunks)
+        Indexer.create_index(chunks, INDEX_DIRECTORY)
         print(f"Ingestion complete! Indices saved under {INDEX_DIRECTORY}")
 
-    def search(self, query: str, k: int = 10) -> str:
+    def search(
+        self,
+        query: str,
+        k: int = 10
+    ) -> str:
         searcher = Searcher(INDEX_DIRECTORY)
         entry = UnansweredQuestion(question=query)
-        results = searcher.search(entry, k)
-        print(json.dumps(results.model_dump(), indent=4))
-        return results.model_dump_json()
+        results = searcher.search(entry, k).model_dump_json(indent=4)
+        print(results)
+        return results
 
-    def search_dataset(self, dataset_path: str, k: int = 10,
-                       save_directory: str = SEARCH_DIRECTORY) -> None:
+    def search_dataset(
+        self,
+        dataset_path: str,
+        k: int = 10,
+        save_directory: str = SEARCH_DIRECTORY
+    ) -> None:
         searcher = Searcher(INDEX_DIRECTORY)
         results = searcher.search_dataset(dataset_path, k)
-        searcher.save_search_results(results, save_directory)
-        print("Saved student_search_results to "
-              f"{save_directory}/dataset_docs_public.json")
 
-    def answer(self, query: str, k: int = 10) -> str:
-        results = Searcher(INDEX_DIRECTORY).search(query, k)
-        answers = Answerer().answer_dataset(results)
-        print(json.dumps(answers.model_dump(), indent=4))
-        return answers.model_dump_json()
+        save_path = f"{save_directory}/{dataset_path.split("/")[-1]}"
+        IOUtils.save_object_as_json(save_path, results)
+        print(f"Saved student_search_results to {save_path}")
 
-    def answer_dataset(self, student_search_results_path: str,
-                       save_directory: str) -> None:
-        answerer = Answerer()
-        dataset = answerer.load_dataset(student_search_results_path)
+    def answer(
+        self,
+        query: str,
+        k: int = 10
+    ) -> str:
+        searcher = Searcher(INDEX_DIRECTORY)
+        results = searcher.search(query, k)
+        answers = Answerer().answer_dataset(results).model_dump_json(indent=4)
+        print(answers)
+        return answers
+
+    def answer_dataset(
+        self,
+        student_search_results_path: str,
+        save_directory: str
+    ) -> None:
+        dataset = IOUtils.load_json_as_model(
+            student_search_results_path, StudentSearchResults
+        )
         total = len(dataset.search_results)
         print(f"Loaded {total} questions from {student_search_results_path}")
+
+        answerer = Answerer()
         answers = asyncio.run(answerer.answer_dataset(dataset))
         count = len(answers.search_results)
         print(f"Processed {count} of {total} questions")
-        answerer.save_answers(answers, save_directory)
-        print("Saved student_search_results_and_answer to "
-              f"{save_directory}/dataset_docs_public.json")
 
-    def evaluate(self, student_answer_path: str, dataset_path: str,
-                 k: int, max_context_length: int) -> None:
+        save_path = f"{save_directory}/{student_search_results_path.split("/")[-1]}"
+        IOUtils.save_object_as_json(save_path, answers)
+        print(f"Saved student_search_results_and_answer to {save_path}")
+
+    def evaluate(
+        self,
+        student_answer_path: str,
+        dataset_path: str,
+        k: int,
+        max_context_length: int
+    ) -> None:
         evaluator = Evaluator(student_answer_path, dataset_path)
         evaluator.validate(max_context_length)
         print()

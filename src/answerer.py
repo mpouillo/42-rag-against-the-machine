@@ -1,11 +1,21 @@
 import json
 import ollama
 
+from flashrank import Ranker, RerankRequest
 from pathlib import Path
 from tqdm.asyncio import tqdm_asyncio
-from typing import Dict
+from typing import Dict, List
 
-from .constants import LLM_NUM_PREDICT, LLM_TEMPERATURE, LLM_SYSTEM_PROMPT
+from .constants import (
+    LLM_NUM_PREDICT,
+    LLM_TEMPERATURE,
+    LLM_FAILURE_ANSWER,
+    LLM_SYSTEM_PROMPT,
+    RERANKER_THRESHOLD,
+    RERANKER_CACHE_DIR,
+    RERANKER_LLM_MODEL
+)
+from .ioutils import IOUtils
 from .models import (
     MinimalAnswer,
     MinimalSearchResults,
@@ -18,48 +28,56 @@ class Answerer:
     def __init__(self, llm: str = "qwen3:0.6b") -> None:
         self.llm: str = llm
         self.client = ollama.AsyncClient()
-        self._file_cache: Dict[str, str] = {}
+        self.ranker = Ranker(model_name=RERANKER_LLM_MODEL,
+                             cache_dir=RERANKER_CACHE_DIR,
+                             log_level="ERROR")
 
         if llm not in [m.model for m in ollama.list().models]:
             print(f"Installing model '{llm}'...")
             ollama.pull(llm)
 
-    def load_dataset(self, dataset_path: str) -> StudentSearchResults:
-        dataset_file = Path(dataset_path)
-        dataset_json = json.loads(dataset_file.read_text())
-        return StudentSearchResults(**dataset_json)
+    def filter_sources(self, query: str, sources: List[str]) -> List[str]:
+        passages = [
+            {"id": idx, "text": text}
+            for idx, text in enumerate(sources)
+        ]
 
-    def retrieve_source(self, file_path: str, first_character_index: int,
-                        last_character_index: int) -> str:
-        if file_path not in self._file_cache:
-            self._file_cache[file_path] = Path(file_path).read_text()
-        text = self._file_cache[file_path]
-        return text[first_character_index:last_character_index]
+        rank_request = RerankRequest(query=query, passages=passages)
+        reranked_results = self.ranker.rerank(rank_request)
+
+        return [doc["text"] for doc in reversed(reranked_results)
+                    if doc["score"] >= RERANKER_THRESHOLD]
 
     async def answer_dataset(self, dataset: StudentSearchResults) \
             -> StudentSearchResultsAndAnswer:
 
         async def process_entry(entry: MinimalSearchResults) -> MinimalAnswer:
             sources = [
-                self.retrieve_source(
+                IOUtils.get_text_from_file(
                     source.file_path,
                     source.first_character_index,
-                    source.last_character_index)
+                    source.last_character_index
+                )
                 for source in entry.retrieved_sources
             ]
 
-            context = "\n\n\n".join(sources)
+            context = self.filter_sources(entry.question, sources)
+            if not context:
+                return MinimalAnswer(**entry.model_dump(),
+                                     answer=LLM_FAILURE_ANSWER)
+
             user_content = (
-                f"Instructions: {LLM_SYSTEM_PROMPT}\n\n"
-                f"Context:\n{context}\n\n"
-                f"Question: {entry.question}\n\n"
-                f"Remember: {LLM_SYSTEM_PROMPT}\n\n"
-                "Answer the question now:"
+                f"# Instructions: {LLM_SYSTEM_PROMPT}\n\n"
+                f"# Context:\n{"\n\n\n".join(context)}\n\n"
+                f"# Question: {entry.question}\n\n"
+                f"# Remember: {LLM_SYSTEM_PROMPT}\n\n"
+                "# Answer the question now:\n"
             )
             response = await self.client.chat(
                 model=self.llm,
                 messages=[{"role": "user", "content": user_content}],
-                options={"temperature": LLM_TEMPERATURE, "num_predict": LLM_NUM_PREDICT}
+                options={"temperature": LLM_TEMPERATURE,
+                         "num_predict": LLM_NUM_PREDICT}
             )
 
             return MinimalAnswer(
@@ -71,10 +89,3 @@ class Answerer:
         return StudentSearchResultsAndAnswer(
             search_results=answers, k=dataset.k
         )
-
-    def save_answers(self, answers: StudentSearchResults,
-                     save_directory: str) -> None:
-        save_file = Path(save_directory) / "dataset_docs_public.json"
-        save_file.parent.mkdir(parents=True, exist_ok=True)
-        results_json = answers.model_dump()
-        save_file.write_text(json.dumps(results_json, indent=4))
