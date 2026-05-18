@@ -50,7 +50,7 @@ class Searcher:
         dataset = RagDataset(**dataset_json)
 
         results = []
-        for entry in tqdm(dataset.rag_questions):
+        for entry in tqdm(dataset.rag_questions, desc="Processing..."):
             results.append(self.search(entry, k))
 
         return StudentSearchResults(search_results=results, k=k)

@@ -50,7 +50,7 @@ class RagInterface(object):
 
     def answer_dataset(self, student_search_results_path: str,
                        save_directory: str) -> None:
-        answerer = Answerer("llama3.2:1b")
+        answerer = Answerer()
         dataset = answerer.load_dataset(student_search_results_path)
         total = len(dataset.search_results)
         print(f"Loaded {total} questions from {student_search_results_path}")

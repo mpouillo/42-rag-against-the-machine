@@ -45,7 +45,7 @@ start-server:
 	@curl -s http://localhost:11434 >/dev/null 2>&1; \
 	if [ $$? -ne 0 ]; then \
 		echo "Starting ollama server..."; \
-		export OLLAMA_NUM_PARALLEL=4; \
+		export OLLAMA_NUM_PARALLEL=2; \
 		export OLLAMA_FLASH_ATTENTION=1; \
 		ollama serve > /dev/null 2>&1 & \
 		until curl -s http://localhost:11434 >/dev/null 2>&1; do sleep 1; done; \

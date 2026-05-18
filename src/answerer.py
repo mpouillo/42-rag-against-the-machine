@@ -5,7 +5,7 @@ from pathlib import Path
 from tqdm.asyncio import tqdm_asyncio
 from typing import Dict
 
-from .constants import LLM_TEMPERATURE, SYSTEM_PROMPT
+from .constants import LLM_NUM_PREDICT, LLM_TEMPERATURE, LLM_SYSTEM_PROMPT
 from .models import (
     MinimalAnswer,
     MinimalSearchResults,
@@ -50,23 +50,23 @@ class Answerer:
 
             context = "\n\n\n".join(sources)
             user_content = (
-                f"Instructions: {SYSTEM_PROMPT}\n\n"
+                f"Instructions: {LLM_SYSTEM_PROMPT}\n\n"
                 f"Context:\n{context}\n\n"
                 f"Question: {entry.question}\n\n"
-                f"Remember: {SYSTEM_PROMPT}\n\n"
+                f"Remember: {LLM_SYSTEM_PROMPT}\n\n"
                 "Answer the question now:"
             )
             response = await self.client.chat(
                 model=self.llm,
                 messages=[{"role": "user", "content": user_content}],
-                options={"temperature": LLM_TEMPERATURE}
+                options={"temperature": LLM_TEMPERATURE, "num_predict": LLM_NUM_PREDICT}
             )
 
             return MinimalAnswer(
                 **entry.model_dump(), answer=response.message.content
             )
 
-        tasks = [process_entry(entry) for entry in dataset.search_results[:5]]
+        tasks = [process_entry(entry) for entry in dataset.search_results]
         answers = await tqdm_asyncio.gather(*tasks, desc="Processing...")
         return StudentSearchResultsAndAnswer(
             search_results=answers, k=dataset.k
