@@ -2,7 +2,6 @@
 
 import asyncio
 import fire
-import json
 import sys
 
 from .answerer import Answerer
@@ -83,7 +82,8 @@ class RagInterface(object):
         count = len(answers.search_results)
         print(f"Processed {count} of {total} questions")
 
-        save_path = f"{save_directory}/{student_search_results_path.split("/")[-1]}"
+        save_path = (f"{save_directory}/"
+                     f"{student_search_results_path.split("/")[-1]}")
         IOUtils.save_object_as_json(save_path, answers)
         print(f"Saved student_search_results_and_answer to {save_path}")
 

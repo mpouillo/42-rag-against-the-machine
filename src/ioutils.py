@@ -4,6 +4,7 @@ from pydantic import BaseModel
 
 T = TypeVar("T", bound=BaseModel)
 
+
 class IOUtils:
     @staticmethod
     def load_json_as_model(

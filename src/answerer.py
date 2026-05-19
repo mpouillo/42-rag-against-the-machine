@@ -1,10 +1,8 @@
-import json
 import ollama
 
 from flashrank import Ranker, RerankRequest
-from pathlib import Path
 from tqdm.asyncio import tqdm_asyncio
-from typing import Dict, List
+from typing import List
 
 from .constants import (
     LLM_NUM_PREDICT,
@@ -46,7 +44,7 @@ class Answerer:
         reranked_results = self.ranker.rerank(rank_request)
 
         return [doc["text"] for doc in reversed(reranked_results)
-                    if doc["score"] >= RERANKER_THRESHOLD]
+                if doc["score"] >= RERANKER_THRESHOLD]
 
     async def answer_dataset(self, dataset: StudentSearchResults) \
             -> StudentSearchResultsAndAnswer:

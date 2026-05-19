@@ -78,7 +78,8 @@ class Evaluator:
         count = 0
 
         for entry in student:
-            truth = next((q for q in correct if q.question_id == entry.question_id), None)
+            truth = next((q for q in correct
+                          if q.question_id == entry.question_id), None)
             if truth and getattr(truth, "sources", None):
                 count += 1
         return count
@@ -88,17 +89,23 @@ class Evaluator:
         source: MinimalSource,
         truth_source: MinimalSource
     ) -> bool:
-        if getattr(source, 'file_path', None) != getattr(truth_source, 'file_path', None):
+        if (
+            getattr(source, 'file_path', None)
+            != getattr(truth_source, 'file_path', None)
+        ):
             return False
 
-        start_inter = max(source.first_character_index, truth_source.first_character_index)
-        end_inter = min(source.last_character_index, truth_source.last_character_index)
+        start_inter = max(source.first_character_index,
+                          truth_source.first_character_index)
+        end_inter = min(source.last_character_index,
+                        truth_source.last_character_index)
 
         intersection = max(0, end_inter - start_inter)
         if intersection == 0:
             return False
 
-        len_truth = truth_source.last_character_index - truth_source.first_character_index
+        len_truth = (truth_source.last_character_index
+                     - truth_source.first_character_index)
         if len_truth == 0:
             return False
 
@@ -119,10 +126,8 @@ class Evaluator:
         truth_checked = 0
 
         for entry in student:
-            truth = next(
-                (q for q in correct
-                if q.question_id == entry.question_id), None
-            )
+            truth = next((q for q in correct
+                          if q.question_id == entry.question_id), None)
 
             if not truth or not truth.sources:
                 continue
