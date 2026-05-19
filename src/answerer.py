@@ -43,8 +43,10 @@ class Answerer:
         rank_request = RerankRequest(query=query, passages=passages)
         reranked_results = self.ranker.rerank(rank_request)
 
-        return [doc["text"] for doc in reversed(reranked_results)
-                if doc["score"] >= RERANKER_THRESHOLD]
+        return [
+            doc["text"] for doc in reranked_results
+            if doc["score"] >= RERANKER_THRESHOLD
+        ]
 
     async def answer_dataset(self, dataset: StudentSearchResults) \
             -> StudentSearchResultsAndAnswer:
@@ -59,20 +61,20 @@ class Answerer:
                 for source in entry.retrieved_sources
             ]
 
-            context = self.filter_sources(entry.question, sources)
+            context = self.filter_sources(entry.question, sources)[:3]
             if not context:
                 return MinimalAnswer(**entry.model_dump(),
                                      answer=LLM_FAILURE_ANSWER)
 
             user_content = (
-                f"# Instructions: {LLM_SYSTEM_PROMPT}\n\n"
-                f"# Context:\n{"\n\n\n".join(context)}\n\n"
-                f"# Question: {entry.question}\n\n"
-                f"# Remember: {LLM_SYSTEM_PROMPT}\n\n"
-                "# Answer the question now:\n"
+                "/no_think "
+                f"# Context:\n{"\n\n".join(context[::-1])}\n\n\n"
+                f"# Instructions:\n{LLM_SYSTEM_PROMPT}\n\n\n"
+                f"# Question:\n{entry.question}\n\n\n"
             )
             response = await self.client.chat(
                 model=self.llm,
+                think=False,
                 messages=[{"role": "user", "content": user_content}],
                 options={"temperature": LLM_TEMPERATURE,
                          "num_predict": LLM_NUM_PREDICT}

@@ -6,8 +6,8 @@ INGEST_DIRECTORY = "data/raw"
 SEARCH_DIRECTORY = "data/output/search_results"
 
 # LLM
-LLM_TEMPERATURE = 0.1
-LLM_NUM_PREDICT = 999
+LLM_TEMPERATURE = 0.2
+LLM_NUM_PREDICT = 1024
 LLM_FAILURE_ANSWER = "I'm sorry, but I couldn't find any relevant information \
 in the database to answer your question."
 LLM_SYSTEM_PROMPT = """
