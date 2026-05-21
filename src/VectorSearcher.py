@@ -1,5 +1,6 @@
 import json
 import numpy
+import tqdm
 
 from pathlib import Path
 from sentence_transformers import SentenceTransformer
@@ -25,6 +26,8 @@ class VectorSearcher:
                 "'corpus' parameter must be a list of MinimalSource."
             )
 
+        self.corpus = corpus
+
         text_corpus = [
             IOUtils.get_text_from_file(**chunk.model_dump())
             for chunk in corpus
@@ -32,14 +35,25 @@ class VectorSearcher:
 
         pool = self.model.start_multi_process_pool()
 
+        all_embeddings = []
+        chunk_size = 2000
+
         try:
-            self.embeddings = self.model.encode_multi_process(
-                text_corpus,
-                show_progress_bar=True,
-                pool=pool,
-                batch_size=64
-            ).astype('float32')
+            for i in tqdm(range(0, len(text_corpus), chunk_size),
+                          desc="Encoding Vectors"):
+                batch_text = text_corpus[i:i + chunk_size]
+
+                batch_embeds = self.model.encode_multi_process(
+                    batch_text,
+                    pool=pool,
+                    batch_size=64
+                )
+                all_embeddings.append(batch_embeds)
+
+            self.embeddings = numpy.vstack(all_embeddings).astype('float32')
+
         finally:
+            # Force close pool workers safely
             self.model.stop_multi_process_pool(pool)
 
         norms = numpy.linalg.norm(self.embeddings, axis=1, keepdims=True)
