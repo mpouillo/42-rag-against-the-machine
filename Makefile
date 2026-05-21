@@ -12,21 +12,6 @@ SRC = src
 K=10
 CONTEXT_LENGTH=2000
 
-DEPS =	bm25s[full] \
-		chromadb \
-		dspy \
-		fire \
-		flake8 \
-		langchain \
-		langchain-text-splitters \
-		mypy \
-		ollama \
-		pudb \
-		pydantic \
-		PyStemmer \
-		transformers \
-		tqdm
-
 all: install
 
 install:
@@ -34,7 +19,6 @@ install:
 		echo "installing uv..."; \
 		curl -LsSf https://astral.sh/uv/install.sh | sh >/dev/null 2>&1; \
 	fi
-	@$(UV) add $(DEPS)
 	@$(MAKE) sync --no-print-directory
 
 sync:
@@ -45,7 +29,7 @@ start-server:
 	@curl -s http://localhost:11434 >/dev/null 2>&1; \
 	if [ $$? -ne 0 ]; then \
 		echo "Starting ollama server..."; \
-		export OLLAMA_NUM_PARALLEL=2; \
+		export OLLAMA_NUM_PARALLEL=8; \
 		export OLLAMA_FLASH_ATTENTION=1; \
 		ollama serve > /dev/null 2>&1 & \
 		until curl -s http://localhost:11434 >/dev/null 2>&1; do sleep 1; done; \
@@ -71,21 +55,21 @@ test-index:
 test-search:
 	@echo "Testing search..."
 	@$(UV) run python -m $(SRC) search_dataset \
-	--dataset_path data/datasets_public/public/UnansweredQuestions/dataset_code_public.json \
+	--dataset_path data/datasets_public/public/UnansweredQuestions/dataset_docs_public.json \
 	--k $(K) \
 	--save_directory data/output/search_results
 
 test-answer: start-server
 	@echo "Testing answer..."
 	@$(UV) run python -m $(SRC) answer_dataset \
-	--student_search_results_path data/output/search_results/dataset_code_public.json \
+	--student_search_results_path data/output/search_results/dataset_docs_public.json \
 	--save_directory data/output/search_results_and_answer
 
 test-evaluate:
 	@echo "Testing evaluate..."
 	@$(UV) run python -m $(SRC) evaluate \
-	--student_answer_path data/output/search_results/dataset_code_public.json \
-	--dataset_path data/datasets_public/public/AnsweredQuestions/dataset_code_public.json \
+	--student_answer_path data/output/search_results/dataset_docs_public.json \
+	--dataset_path data/datasets_public/public/AnsweredQuestions/dataset_docs_public.json \
 	--k $(K) \
 	--max_context_length $(CONTEXT_LENGTH)
 

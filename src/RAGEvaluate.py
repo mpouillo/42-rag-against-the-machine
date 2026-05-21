@@ -16,7 +16,7 @@ from .models import (
 QList: TypeAlias = List[UnansweredQuestion | AnsweredQuestion]
 
 
-class Evaluator:
+class RAGEvaluate:
     def __init__(
         self,
         student_path: str,

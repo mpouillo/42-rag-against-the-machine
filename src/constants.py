@@ -1,9 +1,14 @@
 # Files
 INDEX_DIRECTORY = "data/processed/"
 BM25_DIRECTORY = "bm25"
-CHUNK_PATH = "data/processed/chunks.json"
 INGEST_DIRECTORY = "data/raw"
 SEARCH_DIRECTORY = "data/output/search_results"
+BM25_CORPUS = "metadata_corpus.json"
+
+VECTOR_DIRECTORY = "vector"
+VECTOR_CORPUS = "metadata_corpus.json"
+VECTOR_EMBEDDINGS = "vectors.npy"
+
 
 # LLM
 LLM_TEMPERATURE = 0.2
@@ -34,3 +39,5 @@ RERANKER_LLM_MODEL = "ms-marco-MiniLM-L-12-v2"
 
 # Recall@k
 RECALL_THRESHOLD = 0.05
+
+VECTOR_SEARCH_LLM = "all-MiniLM-L6-v2"

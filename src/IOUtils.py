@@ -28,7 +28,8 @@ class IOUtils:
     @staticmethod
     def get_text_from_file(
         file_path: str,
-        start: int = 0,
-        end: int | None = None
+        first_character_index: int = 0,
+        last_character_index: int | None = None
     ) -> str:
-        return Path(file_path).read_text()[start:end]
+        text = Path(file_path).read_text()
+        return text[first_character_index:last_character_index]
