@@ -20,15 +20,21 @@ from .constants import RERANKER_LLM_MODEL
 class RAGSearch:
     def __init__(
         self,
-        index_directory: str
+        index_directory: str,
+        hybrid_retrieval: bool = False
     ):
+        self.hybrid_retrieval = hybrid_retrieval
+        self._query_cache = {}
+
         self.bm25 = BM25Index()
-        self.bm25.load(index_directory)
-        self.vector = VectorIndex()
-        self.vector.load(index_directory)
         self.reranker = Reranker(RERANKER_LLM_MODEL)
         self.rewriter = QueryRewriter()
-        self._query_cache = {}
+
+        self.bm25.load(index_directory)
+
+        if self.hybrid_retrieval:
+            self.vector = VectorIndex()
+            self.vector.load(index_directory)
 
     def compute_rrf(
         self,
@@ -61,19 +67,22 @@ class RAGSearch:
         rerank_k = k * 2
 
         search_results = []
-        for entry in tqdm(dataset.rag_questions, desc="Querying indices"):
+        for entry in tqdm(dataset.rag_questions, desc="Processing queries"):
             if entry.question in self._query_cache:
                 search_results.append(self._query_cache[entry.question])
                 continue
 
             query = self.rewriter.rewrite_query(entry.question)
             bm25_srcs = self.bm25.search(query, pool)
-            # vector_srcs = self.vector.search(query, pool)
-            # combined_srcs = self.compute_rrf([bm25_srcs, vector_srcs])
-            # deduped_srcs = IOUtils.deduplicate_sources(combined_srcs)
+
+            if self.hybrid_retrieval:
+                vector_srcs = self.vector.search(query, pool)
+                retrieved_srcs = self.compute_rrf([bm25_srcs, vector_srcs])
+            else:
+                retrieved_srcs = bm25_srcs
 
             reranked_srcs = self.reranker.rerank_sources(
-                entry.question, bm25_srcs[:rerank_k]
+                entry.question, retrieved_srcs[:rerank_k]
             )
 
             src_result = MinimalSearchResults(
