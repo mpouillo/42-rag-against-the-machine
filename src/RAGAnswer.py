@@ -1,12 +1,11 @@
-import ollama
-
 from tqdm.asyncio import tqdm_asyncio
 
 from .constants import (
     LLM_NUM_PREDICT,
     LLM_TEMPERATURE,
     LLM_FAILURE_ANSWER,
-    LLM_SYSTEM_PROMPT
+    LLM_SYSTEM_PROMPT,
+    CONTEXT_TRIM
 )
 from .IOUtils import IOUtils
 from .models import (
@@ -15,43 +14,34 @@ from .models import (
     StudentSearchResults,
     StudentSearchResultsAndAnswer
 )
-from .Reranker import Reranker
+from .LLMInterface import LLMInterface
 
 
-class Answerer:
+class RAGAnswer(LLMInterface):
     def __init__(self, llm: str = "qwen3:0.6b") -> None:
-        self.llm: str = llm
-        self.client = ollama.AsyncClient()
-        self.reranker = Reranker()
-
-        if llm not in [m.model for m in ollama.list().models]:
-            print(f"Installing model '{llm}'...")
-            ollama.pull(llm)
+        super().__init__(llm)
 
     async def answer_dataset(self, dataset: StudentSearchResults) \
             -> StudentSearchResultsAndAnswer:
+        await self._check_ready()
 
         async def process_entry(entry: MinimalSearchResults) -> MinimalAnswer:
-            sources = [
-                IOUtils.get_text_from_file(
-                    source.file_path,
-                    source.first_character_index,
-                    source.last_character_index
-                )
-                for source in entry.retrieved_sources
-            ]
+            context = [
+                IOUtils.get_text_from_file(**src.model_dump())
+                for src in entry.retrieved_sources
+            ][:CONTEXT_TRIM]
 
-            context = self.reranker.filter_sources(entry.question, sources)[:3]
             if not context:
                 return MinimalAnswer(**entry.model_dump(),
                                      answer=LLM_FAILURE_ANSWER)
 
             user_content = (
-                "/no_think "
+                "/no_think\n"
                 f"# Instructions:\n{LLM_SYSTEM_PROMPT}\n\n\n"
                 f"# Context:\n{"\n\n".join(context[::-1])}\n\n\n"
                 f"# Question:\n{entry.question}\n\n\n"
             )
+
             response = await self.client.chat(
                 model=self.llm,
                 think=False,
@@ -66,7 +56,7 @@ class Answerer:
             )
 
         tasks = [process_entry(entry) for entry in dataset.search_results]
-        answers = await tqdm_asyncio.gather(*tasks, desc="Processing...")
+        answers = await tqdm_asyncio.gather(*tasks, desc="Answering queries")
         return StudentSearchResultsAndAnswer(
             search_results=answers, k=dataset.k
         )

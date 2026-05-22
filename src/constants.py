@@ -26,7 +26,7 @@ Follow these strict output rules:
 reading your answer.
 3. Never reference or mention the context directly. Act as if the information \
 provided in the context is your own permanent knowledge and explain it to the \
-user.
+user while citing the source.
 4. Omit any thinking (e.g., <think> tags) or reasoning (e.g., "Based on...").
 5. Keep the response clear, precise, natural, and under 5 sentences.
 """
@@ -36,6 +36,8 @@ RERANKER_THRESHOLD = 0.5
 RERANKER_CACHE_DIR = "./opt"
 RERANKER_LLM_MODEL = "ms-marco-MiniLM-L-12-v2"
 # Faster: "ms-marco-TinyBERT-L-2-v2"
+RERANKER_CROP = 1500
+CONTEXT_TRIM = 3
 
 # Recall@k
 RECALL_THRESHOLD = 0.05

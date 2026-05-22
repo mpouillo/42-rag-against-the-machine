@@ -1,12 +1,9 @@
-import json
-
-from pathlib import Path
 from typing import List, TypeAlias
 
 from .constants import RECALL_THRESHOLD
+from .IOUtils import IOUtils
 from .models import (
     AnsweredQuestion,
-    MinimalSearchResults,
     MinimalSource,
     RagDataset,
     StudentSearchResults,
@@ -19,51 +16,50 @@ QList: TypeAlias = List[UnansweredQuestion | AnsweredQuestion]
 class RAGEvaluate:
     def __init__(
         self,
-        student_path: str,
-        correct_path: str
-    ) -> None:
-        self.student_path = student_path
-        self.correct_path = correct_path
-
-    def load_dataset(
-        self,
+        student_answer_path: str,
         dataset_path: str
-    ) -> RagDataset:
-        dataset_file = Path(dataset_path)
-        dataset_json = json.loads(dataset_file.read_text())
-        return RagDataset(**dataset_json)
+    ) -> None:
+        self.student = IOUtils.load_json_as_model(
+            student_answer_path, StudentSearchResults
+        )
+        self.dataset = IOUtils.load_json_as_model(
+            dataset_path, RagDataset
+        )
 
-    def load_student(
+    def validate_student(
         self,
-        answers_path: str
-    ) -> StudentSearchResults:
-        dataset_file = Path(answers_path)
-        dataset_json = json.loads(dataset_file.read_text())
-        return StudentSearchResults(**dataset_json)
-
-    def validate_context_length(
-        self,
-        dataset: List[MinimalSearchResults],
-        length: int
+        k: int,
+        max_context_length: int
     ) -> bool:
-        for entry in dataset:
+        if not self.student.k == k:
+            return False
+
+        for entry in self.student.search_results:
             for source in entry.retrieved_sources:
                 if not (source.last_character_index
-                        - source.first_character_index <= length):
+                        - source.first_character_index <= max_context_length):
                     return False
         return True
 
     def validate(
         self,
+        k: int,
         max_context_length: int
     ) -> None:
-        student = self.load_student(self.student_path).search_results
-        correct = self.load_dataset(self.correct_path).rag_questions
-
-        valid_len = self.validate_context_length(student, max_context_length)
-        c1 = len({q.question_id for q in correct})
-        c2 = len({q.question_id for q in correct if q.sources})
-        c3 = len({q.question_id for q in student if q.retrieved_sources})
+        valid_len = self.validate_student(
+            k, max_context_length
+        )
+        c1 = len(
+            {entry.question_id for entry in self.dataset.rag_questions}
+        )
+        c2 = len(
+            {entry.question_id for entry in self.dataset.rag_questions
+             if entry.sources}
+        )
+        c3 = len(
+            {entry.question_id for entry in self.student.search_results
+             if entry.retrieved_sources}
+        )
 
         print("Student data is valid:", valid_len)
         print("Total number of questions:", c1)
@@ -73,14 +69,12 @@ class RAGEvaluate:
     def count_evaluated(
         self
     ) -> int:
-        student = self.load_student(self.student_path).search_results
-        correct = self.load_dataset(self.correct_path).rag_questions
         count = 0
 
-        for entry in student:
-            truth = next((q for q in correct
+        for entry in self.student.search_results:
+            gtruth = next((q for q in self.dataset.rag_questions
                           if q.question_id == entry.question_id), None)
-            if truth and getattr(truth, "sources", None):
+            if gtruth and getattr(gtruth, "sources", None):
                 count += 1
         return count
 
@@ -110,48 +104,45 @@ class RAGEvaluate:
             return False
 
         ratio = intersection / len_truth
-        return ratio > RECALL_THRESHOLD
+        return ratio >= RECALL_THRESHOLD
 
     def recallat(
         self,
         k: int
     ) -> float:
-        student = self.load_student(self.student_path).search_results
-        correct = self.load_dataset(self.correct_path).rag_questions
-
-        if not correct:
-            return 1.0
+        if not self.dataset.rag_questions:
+            return 0.0
 
         scores = []
-        truth_checked = 0
+        gtruth_count = 0
 
-        for entry in student:
-            truth = next((q for q in correct
+        for i, entry in enumerate(self.student.search_results, 1):
+            gtruth = next((q for q in self.dataset.rag_questions
                           if q.question_id == entry.question_id), None)
 
-            if not truth or not truth.sources:
+            if not gtruth or not gtruth.sources:
                 continue
 
-            truth_checked += 1
+            gtruth_count += 1
 
             if not entry.retrieved_sources:
                 scores.append(0.0)
                 continue
 
-            unique_truth_found = set()
-            for t_idx, truth_src in enumerate(truth.sources):
+            unique_gtruth_found = set()
+            for t_idx, gtruth_src in enumerate(gtruth.sources):
                 for student_src in entry.retrieved_sources[:k]:
-                    if self.is_source_found(student_src, truth_src):
-                        unique_truth_found.add(t_idx)
+                    if self.is_source_found(student_src, gtruth_src):
+                        print(f"src {i} found")
+                        unique_gtruth_found.add(t_idx)
                         break
 
-            scores.append(len(unique_truth_found) / len(truth.sources))
+            scores.append(len(unique_gtruth_found) / len(gtruth.sources))
 
-        return sum(scores) / truth_checked if truth_checked > 0 else 0.0
+        return sum(scores) / gtruth_count if gtruth_count > 0 else 0.0
 
     def evaluate(
         self,
-        k: int
     ) -> None:
         count = self.count_evaluated()
         r1 = self.recallat(1)

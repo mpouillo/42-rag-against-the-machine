@@ -1,6 +1,6 @@
-from .BM25Interface import BM25Interface
+from .BM25Index import BM25Index
 from .Chunker import Chunker
-from .VectorSearcher import VectorSearcher
+from .VectorIndex import VectorIndex
 
 
 class RAGIndex:
@@ -9,21 +9,22 @@ class RAGIndex:
         index_directory: str
     ):
         self.index_dir = index_directory
-        self.bm25 = BM25Interface()
-        self.vector = VectorSearcher()
+        self.bm25 = BM25Index()
+        self.vector = VectorIndex()
 
     def index_and_save(
         self,
         max_chunk_size: int,
         input_dir: str,
     ):
-        py_docs = Chunker.parse_dir(input_dir, "*.py")
-        md_docs = Chunker.parse_dir(input_dir, "*.md")
+        chunker = Chunker()
+        py_docs = chunker.parse_dir(input_dir, "*.py")
+        md_docs = chunker.parse_dir(input_dir, "*.md")
 
-        docs = (Chunker.chunkify(md_docs, "markdown", max_chunk_size)
-                + Chunker.chunkify(py_docs, "python", max_chunk_size))
+        docs = (chunker.chunkify(md_docs, "markdown", max_chunk_size)
+                + chunker.chunkify(py_docs, "python", max_chunk_size))
 
-        sources = Chunker.convert_docs_to_sources(docs)
+        sources = chunker.convert_docs_to_sources(docs)
 
         self.bm25.index(sources)
         self.bm25.save(self.index_dir)

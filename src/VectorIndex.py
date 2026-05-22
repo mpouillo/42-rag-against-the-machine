@@ -1,9 +1,9 @@
 import json
 import numpy
-import tqdm
 
 from pathlib import Path
 from sentence_transformers import SentenceTransformer
+from tqdm import tqdm
 from typing import Any, Dict, List
 
 from .constants import (
@@ -14,36 +14,39 @@ from .models import MinimalSource
 from .IOUtils import IOUtils
 
 
-class VectorSearcher:
+class VectorIndex:
     def __init__(self, model_name: str = "all-MiniLM-L6-v2") -> None:
         self.model = SentenceTransformer(model_name)
         self.embeddings = None
         self.corpus = []
+        self._cache = {}
 
     def index(self, corpus: List[MinimalSource]) -> None:
         if not all(isinstance(c, MinimalSource) for c in corpus):
             raise ValueError(
                 "'corpus' parameter must be a list of MinimalSource."
             )
-
         self.corpus = corpus
-
-        text_corpus = [
-            IOUtils.get_text_from_file(**chunk.model_dump())
-            for chunk in corpus
-        ]
-
-        pool = self.model.start_multi_process_pool()
-
         all_embeddings = []
         chunk_size = 2000
 
+        text_corpus = []
+        for chunk in corpus:
+            path = chunk.file_path
+            start = chunk.first_character_index
+            end = chunk.last_character_index
+
+            if not path in self._cache:
+                self._cache[path] = Path(path).read_text()
+            text_corpus.append(self._cache[path][start:end])
+
         try:
+            pool = self.model.start_multi_process_pool()
             for i in tqdm(range(0, len(text_corpus), chunk_size),
                           desc="Encoding Vectors"):
                 batch_text = text_corpus[i:i + chunk_size]
 
-                batch_embeds = self.model.encode_multi_process(
+                batch_embeds = self.model.encode(
                     batch_text,
                     pool=pool,
                     batch_size=64
@@ -53,13 +56,12 @@ class VectorSearcher:
             self.embeddings = numpy.vstack(all_embeddings).astype('float32')
 
         finally:
-            # Force close pool workers safely
             self.model.stop_multi_process_pool(pool)
 
         norms = numpy.linalg.norm(self.embeddings, axis=1, keepdims=True)
         self.embeddings = self.embeddings / numpy.where(norms == 0, 1, norms)
 
-    def search(self, query: str, k: int) -> List[Dict[str, Any]]:
+    def search(self, query: str, k: int) -> List[MinimalSource]:
         if self.embeddings is None:
             raise ValueError("Index is empty. Run .index() or .load() first.")
 
@@ -71,18 +73,9 @@ class VectorSearcher:
             query_vector = query_vector / query_norm
 
         scores = numpy.dot(self.embeddings, query_vector)
-
         top_indices = numpy.argsort(scores)[::-1][:k]
 
-        results = []
-        for idx in top_indices:
-            results.append({
-                "id": int(idx),
-                "chunk": self.corpus[idx],
-                "score": float(scores[idx])
-            })
-
-        return results
+        return [self.corpus[i] for i in top_indices]
 
     def save(self, output_dir: str) -> None:
         path = Path(output_dir)

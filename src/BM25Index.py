@@ -6,15 +6,11 @@ from pathlib import Path
 from typing import List
 
 from .constants import BM25_DIRECTORY, BM25_CORPUS
-from .models import (
-    MinimalSource,
-    MinimalSearchResults,
-    UnansweredQuestion
-)
+from .models import MinimalSource
 from .IOUtils import IOUtils
 
 
-class BM25Interface:
+class BM25Index:
     def __init__(
         self
     ) -> None:
@@ -31,12 +27,13 @@ class BM25Interface:
             )
 
         text_corpus = [
+            f"[Source file: {chunk.file_path}]\n" +
             IOUtils.get_text_from_file(**chunk.model_dump())
             for chunk in corpus
         ]
 
         corpus_tokens = bm25s.tokenize(
-            text_corpus, stopwords="en", stemmer=self.stemmer
+            text_corpus, stopwords="en", stemmer=self.stemmer, leave=True
         )
 
         self.retriever = bm25s.BM25(corpus=corpus)
@@ -44,20 +41,16 @@ class BM25Interface:
 
     def search(
         self,
-        entry: UnansweredQuestion,
+        query: str,
         k: int
-    ) -> MinimalSearchResults:
+    ) -> List[MinimalSource]:
         if not self.retriever:
             raise ValueError("Index is empty. Run .index() or .load() first.")
 
-        query_tokens = bm25s.tokenize(entry.question, stemmer=self.stemmer)
+        query_tokens = bm25s.tokenize(query, stemmer=self.stemmer)
         results, _ = self.retriever.retrieve(query_tokens, k=k)
 
-        return MinimalSearchResults(
-            question_id=entry.question_id,
-            question=entry.question,
-            retrieved_sources=results[0]
-        )
+        return results[0].tolist()
 
     def save(
         self,

@@ -1,9 +1,13 @@
 import asyncio
+import json
+
+from src import RAGAnswer
 
 from .constants import INDEX_DIRECTORY, INGEST_DIRECTORY, SEARCH_DIRECTORY
 from .IOUtils import IOUtils
 from .models import RagDataset, StudentSearchResults, UnansweredQuestion
 from .RAGIndex import RAGIndex
+from .RAGAnswer import RAGAnswer
 from .RAGSearch import RAGSearch
 from .RAGEvaluate import RAGEvaluate
 
@@ -43,18 +47,16 @@ class RAGInterface(object):
         filename = dataset_path.split("/")[-1]
         save_path = f"{save_directory}/{filename}"
         IOUtils.save_object_as_json(save_path, results)
-        print(f"Saved {filename} to {save_path}")
+        print(f"Saved {filename.split(".")[0]} to {save_path}")
 
     def answer(
         self,
         query: str,
         k: int = 10
     ) -> str:
-        searcher = Searcher(INDEX_DIRECTORY)
-        results = searcher.search(query, k)
-        answers = Answerer().answer_dataset(results).model_dump_json(indent=4)
-        print(answers)
-        return answers
+        results = StudentSearchResults(**json.loads(self.search(query, k)))
+        answers = asyncio.run(RAGAnswer().answer_dataset(results))
+        return answers.model_dump_json(indent=4)
 
     def answer_dataset(
         self,
@@ -67,8 +69,7 @@ class RAGInterface(object):
         total = len(dataset.search_results)
         print(f"Loaded {total} questions from {student_search_results_path}")
 
-        answerer = Answerer()
-        answers = asyncio.run(answerer.answer_dataset(dataset))
+        answers = asyncio.run(RAGAnswer().answer_dataset(dataset))
         count = len(answers.search_results)
         print(f"Processed {count} of {total} questions")
 
@@ -84,7 +85,7 @@ class RAGInterface(object):
         k: int,
         max_context_length: int
     ) -> None:
-        evaluator = Evaluator(student_answer_path, dataset_path)
-        evaluator.validate(max_context_length)
+        evaluator = RAGEvaluate(student_answer_path, dataset_path)
+        evaluator.validate(k, max_context_length)
         print()
-        evaluator.evaluate(k)
+        evaluator.evaluate()

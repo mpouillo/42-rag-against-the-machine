@@ -8,6 +8,11 @@ class MinimalSource(BaseModel):
     first_character_index: int
     last_character_index: int
 
+    def __hash__(self):
+        return hash((self.file_path,
+                     self.first_character_index,
+                     self.last_character_index))
+
 
 class UnansweredQuestion(BaseModel):
     question_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
