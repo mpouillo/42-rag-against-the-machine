@@ -19,6 +19,7 @@ class RAGInterface(object):
     ) -> None:
         indexer = RAGIndex(INDEX_DIRECTORY)
         indexer.index_and_save(max_chunk_size, INGEST_DIRECTORY)
+        print(f"Ingestion complete! Indices saved under {INDEX_DIRECTORY}")
 
     def search(
         self,

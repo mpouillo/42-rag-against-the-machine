@@ -30,5 +30,3 @@ class RAGIndex:
         self.bm25.save(self.index_dir)
         self.vector.index(sources)
         self.vector.save(self.index_dir)
-
-        print(f"Ingestion complete! Indices saved under {self.index_dir}")
