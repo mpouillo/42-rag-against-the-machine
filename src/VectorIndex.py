@@ -6,22 +6,43 @@ from sentence_transformers import SentenceTransformer
 from tqdm import tqdm
 from typing import Any, Dict, List
 
-from .constants import (
-    VECTOR_EMBEDDINGS,
-    VECTOR_CORPUS
-)
+from .constants import VECTOR_CORPUS, VECTOR_EMBEDDINGS
 from .models import MinimalSource
-from .IOUtils import IOUtils
 
 
 class VectorIndex:
-    def __init__(self, model_name: str = "all-MiniLM-L6-v2") -> None:
-        self.model = SentenceTransformer(model_name)
-        self.embeddings = None
-        self.corpus = []
-        self._cache = {}
+    """Indexing and search pipeline using vector embeddings."""
+    def __init__(
+        self,
+        model: str = "all-MiniLM-L6-v2"
+    ) -> None:
+        """
+        Initialize SentenceTransformer model and class variables
 
-    def index(self, corpus: List[MinimalSource]) -> None:
+        Args:
+            model (str): Name of the LLM model to load
+
+        Returns:
+            None: None
+        """
+        self.model: SentenceTransformer = SentenceTransformer(model)
+        self.embeddings: Any = None
+        self.corpus: List[MinimalSource] = []
+        self._cache: Dict[str, str] = {}
+
+    def index(
+        self,
+        corpus: List[MinimalSource]
+    ) -> None:
+        """
+        Index passed corpus into embeddings in local memory.
+
+        Args:
+            corpus (List[MinimalSource]): List of sources to index
+
+        Returns:
+            None: None
+        """
         if not all(isinstance(c, MinimalSource) for c in corpus):
             raise ValueError(
                 "'corpus' parameter must be a list of MinimalSource."
@@ -36,32 +57,36 @@ class VectorIndex:
             start = chunk.first_character_index
             end = chunk.last_character_index
 
-            if not path in self._cache:
+            if path not in self._cache:
                 self._cache[path] = Path(path).read_text()
             text_corpus.append(self._cache[path][start:end])
 
-        try:
-            pool = self.model.start_multi_process_pool()
-            for i in tqdm(range(0, len(text_corpus), chunk_size),
-                          desc="Encoding Vectors"):
-                batch_text = text_corpus[i:i + chunk_size]
+        for i in tqdm(range(0, len(text_corpus), chunk_size), desc="Encoding vectors"):
+            batch_text = text_corpus[i:i + chunk_size]
 
-                batch_embeds = self.model.encode(
-                    batch_text,
-                    pool=pool,
-                    batch_size=64
-                )
-                all_embeddings.append(batch_embeds)
+            batch_embeds = self.model.encode(
+                batch_text,
+                batch_size=64,
+                show_progress_bar=False
+            )
+            all_embeddings.append(batch_embeds)
 
-            self.embeddings = numpy.vstack(all_embeddings).astype('float32')
-
-        finally:
-            self.model.stop_multi_process_pool(pool)
+        self.embeddings = numpy.vstack(all_embeddings).astype('float32')
 
         norms = numpy.linalg.norm(self.embeddings, axis=1, keepdims=True)
         self.embeddings = self.embeddings / numpy.where(norms == 0, 1, norms)
 
     def search(self, query: str, k: int) -> List[MinimalSource]:
+        """
+        Searches local index for data matching passed query.
+
+        Args:
+            query (str): The text to match against local index
+            k (int): Size of results to return
+
+        Returns:
+            List[MinimalSource]: Top k matching results
+        """
         if self.embeddings is None:
             raise ValueError("Index is empty. Run .index() or .load() first.")
 
@@ -77,16 +102,50 @@ class VectorIndex:
 
         return [self.corpus[i] for i in top_indices]
 
-    def save(self, output_dir: str) -> None:
-        path = Path(output_dir)
+    def save(self, save_dir: str) -> None:
+        """
+        Save local index to file.
+
+        Args:
+            save_dir (str): Path to save data to
+
+        Returns:
+            None: None
+        """
+        path = Path(save_dir)
         path.mkdir(parents=True, exist_ok=True)
 
-        json_corpus = [c.model_dump() for c in self.corpus]
-        numpy.save(str(path / VECTOR_EMBEDDINGS), self.embeddings)
-        (path / VECTOR_CORPUS).write_text(json.dumps(json_corpus))
+        try:
+            json_corpus = [c.model_dump() for c in self.corpus]
+            numpy.save(str(path / VECTOR_EMBEDDINGS), self.embeddings)
+            (path / VECTOR_CORPUS).write_text(json.dumps(json_corpus))
+        except Exception as e:
+            raise ValueError(
+                f"Error saving index to {save_dir}: "
+                "Path cannot be accessed, or an error "
+                "occurred while writing data to file. "
+                f"Details: {e}"
+            )
 
-    def load(self, input_dir: str) -> None:
-        path = Path(input_dir)
-        self.embeddings = numpy.load(str(path / VECTOR_EMBEDDINGS))
-        raw_json = json.loads((path / VECTOR_CORPUS).read_text())
-        self.corpus = [MinimalSource(**src) for src in raw_json]
+    def load(self, load_dir: str) -> None:
+        """
+        Load index from file.
+
+        Args:
+            load_dir (str): Path to load data from
+
+        Returns:
+            None: None
+        """
+        path = Path(load_dir)
+        try:
+            self.embeddings = numpy.load(str(path / VECTOR_EMBEDDINGS))
+            raw_json = json.loads((path / VECTOR_CORPUS).read_text())
+            self.corpus = [MinimalSource(**src) for src in raw_json]
+        except Exception as e:
+            raise ValueError(
+                f"Error loading index from {load_dir}: "
+                "File does not exist, or data is not valid json, "
+                "or data is not a list of MinimalSources. "
+                f"Details: {e}"
+            )

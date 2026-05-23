@@ -1,5 +1,6 @@
-from pydantic import BaseModel, Field
 import uuid
+
+from pydantic import BaseModel, Field
 from typing import List, Sequence
 
 
@@ -8,7 +9,7 @@ class MinimalSource(BaseModel):
     first_character_index: int
     last_character_index: int
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash((self.file_path,
                      self.first_character_index,
                      self.last_character_index))

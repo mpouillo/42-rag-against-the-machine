@@ -1,6 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 from flashrank import Ranker, RerankRequest
-from typing import List
+from typing import Any, Dict, List, Tuple
 
 from .constants import (
     RERANKER_CACHE_DIR,
@@ -11,21 +11,49 @@ from .models import MinimalSource
 
 
 class Reranker:
+    """Source reranking pipeline to improve search engine retrieval."""
     def __init__(
         self,
-        model_name: str = "ms-marco-MiniLM-L-12-v2"
+        model: str = "ms-marco-MiniLM-L-12-v2"
     ) -> None:
+        """
+        Initialize ranker model.
+
+        Args:
+            model (str): Name of the LLM model to use
+
+        Returns:
+            None: None
+        """
         self.ranker = Ranker(
-            model_name=model_name,
+            model_name=model,
             cache_dir=RERANKER_CACHE_DIR,
             log_level="ERROR"
         )
 
-    def _prepare_and_run(self, query: str, sources: List[MinimalSource]) -> List[dict]:
+    def _load_passages(
+        self,
+        sources: List[MinimalSource]
+    ) -> List[Dict[str, Any]]:
+        """
+        Helper function to load corpus from sources.
+
+        Args:
+            sources (list[MinimalSource]): List of sources to load
+
+        Returns:
+            List[Dict[str, Any]]: Corpus of sources with added text data
+        """
         if not sources:
             return []
 
-        def load_passage(item):
+        def load_passage(
+            item: Tuple[int, MinimalSource]
+        ) -> Dict[str, Any]:
+            """
+            Helper function to load source text (limited to RERANKER_CROP char)
+            and return a dict of the total data.
+            """
             idx, src = item
             src_data = src.model_dump()
             return {
@@ -37,8 +65,7 @@ class Reranker:
         with ThreadPoolExecutor(max_workers=10) as executor:
             passages = list(executor.map(load_passage, enumerate(sources)))
 
-        rerank_request = RerankRequest(query=query, passages=passages)
-        return self.ranker.rerank(rerank_request)
+        return passages
 
     def rerank_sources(
         self,
@@ -46,7 +73,21 @@ class Reranker:
         sources: List[MinimalSource],
         min_score: float = -1
     ) -> List[MinimalSource]:
-        reranked_results = self._prepare_and_run(query, sources)
+        """
+        Rerank sources based on LLM scoring.
+
+        Args:
+            query (str): The text to match against sources
+            sources (List[MinimalSource]): List of sources to rerank
+            min_score (float, default=-1): Minimum score to filter sources
+
+        Returns:
+            List[MinimalSource]: List of reranked sources
+        """
+
+        passages = self._load_passages(sources)
+        rerank_request = RerankRequest(query=query, passages=passages)
+        reranked_results = self.ranker.rerank(rerank_request)
 
         return [
             MinimalSource(

@@ -14,11 +14,22 @@ QList: TypeAlias = List[UnansweredQuestion | AnsweredQuestion]
 
 
 class RAGEvaluate:
+    """Core RAG class used to evaluate RAG results."""
     def __init__(
         self,
         student_answer_path: str,
         dataset_path: str
     ) -> None:
+        """
+        Load data from file as Pydantic models.
+
+        Args:
+            student_answer_path (str): Path to data to evaluate
+            dataset_path (str): Path to data to be compared to
+
+        Returns:
+            None: None
+        """
         self.student = IOUtils.load_json_as_model(
             student_answer_path, StudentSearchResults
         )
@@ -31,14 +42,27 @@ class RAGEvaluate:
         k: int,
         max_context_length: int
     ) -> bool:
+        """
+        Validate student dataset based on k and max_context_length.
+
+        Args:
+            k (int): The number of sources to be provided for each question.
+            max_context_length (int): Maximum character size for each source.
+
+        Returns:
+            bool: Whether the whole student dataset passes all validation.
+        """
         if not self.student.k == k:
             return False
 
         for entry in self.student.search_results:
+            if len(entry.retrieved_sources) != k:
+                return False
             for source in entry.retrieved_sources:
                 if not (source.last_character_index
                         - source.first_character_index <= max_context_length):
                     return False
+
         return True
 
     def validate(
@@ -46,6 +70,16 @@ class RAGEvaluate:
         k: int,
         max_context_length: int
     ) -> None:
+        """
+        Print info to terminal about evaluated data.
+
+        Args:
+            k (int): The number of sources to be provided for each question.
+            max_context_length (int): Maximum character size for each source.
+
+        Returns:
+            None: Terminal output.
+        """
         valid_len = self.validate_student(
             k, max_context_length
         )
@@ -54,11 +88,11 @@ class RAGEvaluate:
         )
         c2 = len(
             {entry.question_id for entry in self.dataset.rag_questions
-             if entry.sources}
+             if getattr(entry, "sources")}
         )
         c3 = len(
             {entry.question_id for entry in self.student.search_results
-             if entry.retrieved_sources}
+             if getattr(entry, "retrieved_sources")}
         )
 
         print("Student data is valid:", valid_len)
@@ -69,13 +103,18 @@ class RAGEvaluate:
     def count_evaluated(
         self
     ) -> int:
+        """
+        Return how many student questions were found in
+        the evaluation dataset and can be evaluated.
+        """
         count = 0
 
         for entry in self.student.search_results:
             gtruth = next((q for q in self.dataset.rag_questions
                           if q.question_id == entry.question_id), None)
-            if gtruth and getattr(gtruth, "sources", None):
+            if gtruth and hasattr(gtruth, "sources"):
                 count += 1
+
         return count
 
     def is_source_found(
@@ -83,6 +122,17 @@ class RAGEvaluate:
         source: MinimalSource,
         truth_source: MinimalSource
     ) -> bool:
+        """
+        Check if student source matches evaluation dataset source,
+        meaning they overlap at least RECALL_THRESHOLD (default: 5%).
+
+        Args:
+            source (MinimalSource): the student source to be evaluated.
+            truth_source (MinimalSource): dataset source to compare.
+
+        Returns:
+            bool: Whether both sources overlap at least RECALL_THRESHOLD.
+        """
         if (
             getattr(source, 'file_path', None)
             != getattr(truth_source, 'file_path', None)
@@ -110,6 +160,16 @@ class RAGEvaluate:
         self,
         k: int
     ) -> float:
+        """
+        Compute what proportion of the evaluation dataset's sources
+        can be found in the student's top k retrieved sources.
+
+        Args:
+            k (int): The number of sources to check
+
+        Returns:
+            float: Proportion of found evaluation dataset sources
+        """
         if not self.dataset.rag_questions:
             return 0.0
 
@@ -120,7 +180,7 @@ class RAGEvaluate:
             gtruth = next((q for q in self.dataset.rag_questions
                           if q.question_id == entry.question_id), None)
 
-            if not gtruth or not gtruth.sources:
+            if not gtruth or not hasattr(gtruth, "sources"):
                 continue
 
             gtruth_count += 1
@@ -144,6 +204,7 @@ class RAGEvaluate:
     def evaluate(
         self,
     ) -> None:
+        """Compute recall@k values and print them to the terminal."""
         count = self.count_evaluated()
         r1 = self.recallat(1)
         r3 = self.recallat(3)

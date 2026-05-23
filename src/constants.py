@@ -1,20 +1,19 @@
-# Files
-INDEX_DIRECTORY = "data/processed/"
-BM25_DIRECTORY = "bm25"
-INGEST_DIRECTORY = "data/raw"
-SEARCH_DIRECTORY = "data/output/search_results"
-BM25_CORPUS = "metadata_corpus.json"
+"""Constant variables for easy tweaking."""
 
-VECTOR_DIRECTORY = "vector"
+# Path
+BM25_CORPUS = "metadata_corpus.json"
+BM25_DIRECTORY = "bm25"
+INDEX_DIRECTORY = "data/processed/"
+INGEST_DIRECTORY = "data/raw/"
+SEARCH_DIRECTORY = "data/output/search_results"
 VECTOR_CORPUS = "metadata_corpus.json"
 VECTOR_EMBEDDINGS = "vectors.npy"
 
-
 # LLM
-LLM_TEMPERATURE = 0.2
-LLM_NUM_PREDICT = 1024
+LLM_CONTEXT_TRIM = 3
 LLM_FAILURE_ANSWER = "I'm sorry, but I couldn't find any relevant information \
 in the database to answer your question."
+LLM_NUM_PREDICT = 1024
 LLM_SYSTEM_PROMPT = """
 You are a technical documentation assistant. Your job is to answer the \
 user's question directly and factually using the provided context.
@@ -30,16 +29,18 @@ user while citing the source.
 4. Omit any thinking (e.g., <think> tags) or reasoning (e.g., "Based on...").
 5. Keep the response clear, precise, natural, and under 5 sentences.
 """
+LLM_TEMPERATURE = 0.2
 
 # Reranker
-RERANKER_THRESHOLD = 0.5
 RERANKER_CACHE_DIR = "./opt"
-RERANKER_LLM_MODEL = "ms-marco-MiniLM-L-12-v2"
-# Faster: "ms-marco-TinyBERT-L-2-v2"
 RERANKER_CROP = 1500
-CONTEXT_TRIM = 3
+RERANKER_THRESHOLD = 0.5
 
 # Recall@k
 RECALL_THRESHOLD = 0.05
 
-VECTOR_SEARCH_LLM = "all-MiniLM-L6-v2"
+# Models
+MODEL_VECTOR = "all-MiniLM-L6-v2"
+MODEL_ANSWER = "qwen3:0.6b"
+MODEL_RERANKER = "ms-marco-MiniLM-L-12-v2"  # Alt: "ms-marco-TinyBERT-L-2-v2"
+MODEL_REWRITER = "en_core_web_sm"

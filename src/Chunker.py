@@ -1,5 +1,5 @@
-from langchain_text_splitters import RecursiveCharacterTextSplitter, Language
 from langchain_core.documents import Document
+from langchain_text_splitters import Language, RecursiveCharacterTextSplitter
 from pathlib import Path
 from typing import List
 
@@ -7,12 +7,25 @@ from .models import MinimalSource
 
 
 class Chunker:
+    """Class enabling parsing of text chunks into MinimalSource objects."""
     def chunkify(
         self,
         docs: List[Document],
         language: str,
         max_chunk_size: int = 2000
     ) -> List[Document]:
+        """
+        Split a list of Document objects into chunks of maximum
+        max_chunk_size characters, depending on data language.
+
+        Args:
+            docs (List[Document]): List of Document objects to be split
+            language (str): Language of docs
+            max_chunk_size (int): Maximum size of output chunks
+
+        Returns:
+            List[Document]: list of smaller chunks (< max_chunk_size)
+        """
         match language.lower():
             case "python" | "py":
                 return self._chunk_python(docs, max_chunk_size)
@@ -32,6 +45,16 @@ class Chunker:
         docs: List[Document],
         max_chunk_size: int
     ) -> List[Document]:
+        """
+        Split python file documents.
+
+        Args:
+            docs (List[Document]): List of Document objects to be split
+            max_chunk_size (int): Maximum size of output chunks
+
+        Returns:
+            List[Document]: list of smaller chunks (< max_chunk_size)
+        """
         split_docs = []
         while max_chunk_size >= 200:
             split_docs += RecursiveCharacterTextSplitter.from_language(
@@ -50,6 +73,16 @@ class Chunker:
         docs: List[Document],
         max_chunk_size: int
     ) -> List[Document]:
+        """
+        Split markdown file documents.
+
+        Args:
+            docs (List[Document]): List of Document objects to be split
+            max_chunk_size (int): Maximum size of output chunks
+
+        Returns:
+            List[Document]: list of smaller chunks (< max_chunk_size)
+        """
         split_docs = []
         while max_chunk_size >= 200:
             split_docs += RecursiveCharacterTextSplitter.from_language(
@@ -68,7 +101,17 @@ class Chunker:
         dir_path: str,
         pattern: str
     ) -> List[Document]:
-        """Return a list of files in a directory matching a pattern"""
+        """
+        Read all files in a directory matching a pattern
+        and return them as a list of Document objects.
+
+        Args:
+            dir_path (str): Path of directory to ingest
+            pattern (str): Pattern of files to ingest
+
+        Returns:
+            List[Document]: list of files parsed as Document objects.
+        """
         path = Path(dir_path)
         if not path.is_dir():
             raise ValueError("input directory not found")
@@ -85,6 +128,15 @@ class Chunker:
     def convert_docs_to_sources(
         docs: List[Document]
     ) -> List[MinimalSource]:
+        """
+        Convert a list of Document objects to a list of MinimalSource objects.
+
+        Args:
+            docs (List[Document]): List of Document objects to be converted
+
+        Return:
+            List[MinimalSource]: List of converted MinimalSource objects
+        """
         sources = []
         for doc in docs:
             file_path = doc.metadata.get("path", "")

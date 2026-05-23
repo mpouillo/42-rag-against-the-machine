@@ -1,22 +1,40 @@
 import asyncio
 import json
 
-from src import RAGAnswer
-
-from .constants import INDEX_DIRECTORY, INGEST_DIRECTORY, SEARCH_DIRECTORY
+from .constants import (
+    INDEX_DIRECTORY,
+    INGEST_DIRECTORY,
+    MODEL_ANSWER,
+    SEARCH_DIRECTORY
+)
 from .IOUtils import IOUtils
-from .models import RagDataset, StudentSearchResults, UnansweredQuestion
-from .RAGIndex import RAGIndex
+from .models import (
+    RagDataset,
+    StudentSearchResults,
+    UnansweredQuestion
+)
 from .RAGAnswer import RAGAnswer
-from .RAGSearch import RAGSearch
 from .RAGEvaluate import RAGEvaluate
+from .RAGIndex import RAGIndex
+from .RAGSearch import RAGSearch
 
 
 class RAGInterface(object):
+    """Core RAG class used to provide main RAG functions."""
     def index(
         self,
         max_chunk_size: int = 2000
     ) -> None:
+        """
+        Index data from INGEST_DIRECTORY ("data/raw") and
+        save them to INDEX_DIRECTORY ("data/processed")
+
+        Args:
+            max_chunk_size (int): Maximum size of output chunks
+
+        Returns:
+            None: None
+        """
         indexer = RAGIndex(INDEX_DIRECTORY)
         indexer.index_and_save(max_chunk_size, INGEST_DIRECTORY)
         print(f"Ingestion complete! Indices saved under {INDEX_DIRECTORY}")
@@ -26,6 +44,16 @@ class RAGInterface(object):
         query: str,
         k: int = 10
     ) -> str:
+        """
+        Search index and retrieve top k matching sources for provided query.
+
+        Args:
+            query (str): The text to match against local index
+            k (int): The number of sources to be provided
+
+        Returns:
+            str: JSOn-formatted string of the retrieved StudentSearchResults.
+        """
         searcher = RAGSearch(INDEX_DIRECTORY)
         dataset = RagDataset(
             rag_questions=[
@@ -41,6 +69,20 @@ class RAGInterface(object):
         k: int = 10,
         save_directory: str = SEARCH_DIRECTORY
     ) -> None:
+        """
+        Search index and retrieve top k matching sources for each query
+        in the provided dataset.
+
+        Args:
+            dataset_path (str): Path to the dataset to process
+            k (int): The number of sources to retrieve
+            save_directory (str, default=SEARCH_DIRECTORY): Directory to save
+            search results
+
+        Returns:
+            None: JSOn-formatted string of the retrieved StudentSearchResults
+            saved to file.
+        """
         searcher = RAGSearch(INDEX_DIRECTORY)
         dataset = IOUtils.load_json_as_model(dataset_path, RagDataset)
         results = searcher.search_dataset(dataset, k)
@@ -55,22 +97,46 @@ class RAGInterface(object):
         query: str,
         k: int = 10
     ) -> str:
+        """
+        Search index and retrieve top k matching sources for provided query,
+        then answer them using a LLM.
+
+        Args:
+            query (str): The text to match against local index
+            k (int): The number of sources to be provided
+
+        Returns:
+            str: JSOn-formatted string of the retrieved
+            StudentSearchResultsAndAnswer.
+        """
         results = StudentSearchResults(**json.loads(self.search(query, k)))
-        answers = asyncio.run(RAGAnswer().answer_dataset(results))
+        answers = asyncio.run(RAGAnswer(MODEL_ANSWER).answer_dataset(results))
         return answers.model_dump_json(indent=4)
 
     def answer_dataset(
         self,
         student_search_results_path: str,
-        save_directory: str
+        save_directory: str = SEARCH_DIRECTORY
     ) -> None:
+        """
+        Answer dataset queries based on retrieved sources using a LLM.
+
+        Args:
+            student_search_results_path (str): Path to the dataset to process
+            save_directory (str, default=SEARCH_DIRECTORY): Directory to save
+            search results
+
+        Returns:
+            None: JSOn-formatted string of the retrieved
+            StudentSearchResultsAndAnswer saved to file.
+        """
         dataset = IOUtils.load_json_as_model(
             student_search_results_path, StudentSearchResults
         )
         total = len(dataset.search_results)
         print(f"Loaded {total} questions from {student_search_results_path}")
 
-        answers = asyncio.run(RAGAnswer().answer_dataset(dataset))
+        answers = asyncio.run(RAGAnswer(MODEL_ANSWER).answer_dataset(dataset))
         count = len(answers.search_results)
         print(f"Processed {count} of {total} questions")
 
@@ -86,6 +152,18 @@ class RAGInterface(object):
         k: int,
         max_context_length: int
     ) -> None:
+        """
+        Evaluate student search results based on comparison dataset.
+
+        Args:
+            student_answer_path (str): Path to the dataset to process
+            dataset_path (str): Path to the comparison dataset to process
+            k (int): The number of sources to be provided
+            max_chunk_size (int): Maximum size of output chunks
+
+        Returns:
+            None: Terminal output of the evaluation results.
+        """
         evaluator = RAGEvaluate(student_answer_path, dataset_path)
         evaluator.validate(k, max_context_length)
         print()

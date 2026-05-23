@@ -3,28 +3,52 @@ import asyncio
 from tqdm.asyncio import tqdm_asyncio
 
 from .constants import (
-    LLM_NUM_PREDICT,
-    LLM_TEMPERATURE,
+    LLM_CONTEXT_TRIM,
     LLM_FAILURE_ANSWER,
+    LLM_NUM_PREDICT,
     LLM_SYSTEM_PROMPT,
-    CONTEXT_TRIM
+    LLM_TEMPERATURE
 )
 from .IOUtils import IOUtils
+from .LLMInterface import LLMInterface
 from .models import (
     MinimalAnswer,
     MinimalSearchResults,
     StudentSearchResults,
     StudentSearchResultsAndAnswer
 )
-from .LLMInterface import LLMInterface
 
 
 class RAGAnswer(LLMInterface):
-    def __init__(self, llm: str = "qwen3:0.6b") -> None:
-        super().__init__(llm)
+    """Core RAG class used to answer queries based on provided sources."""
+    def __init__(
+        self,
+        model: str = "qwen3:0.6b"
+    ) -> None:
+        """
+        Initialize LLM client.
 
-    async def answer_dataset(self, dataset: StudentSearchResults) \
-            -> StudentSearchResultsAndAnswer:
+        Args:
+            model (str): Name of the model to use
+
+        Returns:
+            None: None
+        """
+        super().__init__(model)
+
+    async def answer_dataset(
+        self,
+        dataset: StudentSearchResults
+    ) -> StudentSearchResultsAndAnswer:
+        """
+        Answer queries from a StudentSearchResults object using an LLM.
+
+        Args:
+            dataset (StudentSearchResults): dataset to process
+
+        Returns:
+            StudentSearchResultsAndAnswer: dataset with added LLM responses.
+        """
         await self._check_ready()
         sem = asyncio.Semaphore(8)
 
@@ -33,11 +57,11 @@ class RAGAnswer(LLMInterface):
                 context = [
                     IOUtils.get_text_from_file(**src.model_dump())
                     for src in entry.retrieved_sources
-                ][:CONTEXT_TRIM]
+                ][:LLM_CONTEXT_TRIM]
 
                 if not context:
                     return MinimalAnswer(**entry.model_dump(),
-                                        answer=LLM_FAILURE_ANSWER)
+                                         answer=LLM_FAILURE_ANSWER)
 
                 user_content = (
                     "/no_think\n"
@@ -47,20 +71,21 @@ class RAGAnswer(LLMInterface):
                 )
 
                 response = await self.client.chat(
-                    model=self.llm,
+                    model=self.model,
                     think=False,
                     keep_alive=-1,
                     messages=[{"role": "user", "content": user_content}],
                     options={"temperature": LLM_TEMPERATURE,
-                            "num_predict": LLM_NUM_PREDICT}
+                             "num_predict": LLM_NUM_PREDICT}
                 )
 
                 return MinimalAnswer(
-                    **entry.model_dump(), answer=response.message.content
+                    **entry.model_dump(), answer=str(response.message.content)
                 )
 
         tasks = [process_entry(entry) for entry in dataset.search_results]
         answers = await tqdm_asyncio.gather(*tasks, desc="Answering queries")
+
         return StudentSearchResultsAndAnswer(
             search_results=answers, k=dataset.k
         )
