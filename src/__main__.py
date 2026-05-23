@@ -11,7 +11,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    #try:
+    try:
         main()
-    #except BaseException as e:
-    #    sys.exit(f"Error: {e}")
+    except BaseException as e:
+        sys.exit(f"Error: {e}")
