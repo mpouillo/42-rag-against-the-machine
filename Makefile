@@ -6,12 +6,11 @@ NAME = rag_against_the_machine
 PYTHON = python3
 UV = $(shell command -v uv 2> /dev/null || echo $(HOME)/.local/bin/uv)
 UV_PROJECT_ENVIRONMENT ?= .venv
-
 SRC = src
 
-K=10
-CONTEXT_LENGTH=2000
-TYPE=docs
+K ?= 10
+CONTEXT_LENGTH ?= 2000
+TYPE ?= docs
 
 all: install
 
@@ -101,6 +100,8 @@ clean:
 fclean: clean
 	@echo "Removing virtual environment..."
 	$(RM) -r $(UV_PROJECT_ENVIRONMENT)
+	@echo "Removing cache directory..."
+	$(RM) -r opt
 
 re: fclean all
 
