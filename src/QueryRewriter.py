@@ -1,7 +1,7 @@
 import re
 import spacy
 
-from spacy.language import Language
+from spacy.cli.download import download
 from spacy.tokens import Doc
 from typing import List
 
@@ -17,7 +17,7 @@ class QueryRewriter:
             self.nlp = spacy.load(model, disable=["ner", "parser"])
         except Exception:
             print(f"Downloading model '{model}'...")
-            spacy.cli.download(model)
+            download(model)
             self.nlp = spacy.load(model, disable=["ner", "parser"])
 
         self.allowed_pos = {"NOUN", "PROPN", "VERB", "ADJ", "X"}

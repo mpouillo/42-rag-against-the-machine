@@ -66,46 +66,50 @@ class IOUtils:
         sources: List[MinimalSource]
     ) -> List[MinimalSource]:
         """
-        Deduplicate MinimalSources by removing those encompassed by other ones.
+        Remove duplicate MinimalSources contained within other ones.
 
-        Returns a list of deduplicated MinimalSources.
+        Args:
+            sources (List[MinimalSource]): list of MinimalSources to filter
 
-        Keyword arguments:
-        - sources (List[MinimalSource]): list of MinimalSources to filter
+        Returns:
+            List[MinimalSource]: Deduplicated sources
         """
+        if not sources:
+            return []
 
-        file_groups = defaultdict(list)
-        for src in sources:
-            file_groups[src.file_path].append(src)
+        grouped_by_file = defaultdict(list)
+        for idx, src in enumerate(sources):
+            grouped_by_file[src.file_path].append((idx, src))
 
-        retained_sources: List[MinimalSource] = []
+        swallowed_indices = set()
 
-        for file_path, group in file_groups.items():
-            sorted_group = sorted(
-                group,
-                key=lambda x: (
-                    x.first_character_index - x.last_character_index
-                )
-            )
+        for file_path, items in grouped_by_file.items():
+            if len(items) < 2:
+                continue
 
-            files_retained: List[MinimalSource] = []
+            for i in range(len(items)):
+                idx_a, src_a = items[i]
+                start_a = src_a.first_character_index
+                end_a = src_a.last_character_index
 
-            for current in sorted_group:
-                is_contained = False
+                for j in range(len(items)):
+                    if i == j:
+                        continue
 
-                for kept in files_retained:
-                    if (
-                        current.first_character_index
-                        >= kept.first_character_index
-                        and current.last_character_index
-                        <= kept.last_character_index
-                    ):
-                        is_contained = True
+                    idx_b, src_b = items[j]
+                    start_b = src_b.first_character_index
+                    end_b = src_b.last_character_index
+
+                    if start_b <= start_a and end_b >= end_a:
+                        if (
+                            start_b == start_a
+                            and end_b == end_a
+                            and idx_b > idx_a
+                        ):
+                            continue
+
+                        swallowed_indices.add(idx_a)
                         break
 
-                if not is_contained:
-                    files_retained.append(current)
-
-            retained_sources += files_retained
-
-        return retained_sources
+        return [src for idx, src in enumerate(sources)
+                if idx not in swallowed_indices]

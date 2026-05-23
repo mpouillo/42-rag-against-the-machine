@@ -1,3 +1,5 @@
+import os
+
 from collections import defaultdict
 from tqdm import tqdm
 from typing import Any, Dict, List
@@ -8,6 +10,7 @@ from .constants import (
     MODEL_REWRITER,
     MODEL_VECTOR
 )
+from .IOUtils import IOUtils
 from .models import (
     MinimalSearchResults,
     MinimalSource,
@@ -24,20 +27,22 @@ class RAGSearch:
     def __init__(
         self,
         index_directory: str,
-        hybrid_retrieval: bool = False
     ) -> None:
         """
         Initialize indices and query rewriter.
+        If environment variable "HYBRID_RETRIEVAL" is set to True,
+        uses hybrid retrieval for search computation.
 
         Args:
             index_directory (str): Path to index directory
-            hybrid_retrieval (bool, default = False): Whether to use
-            hybrid retrieval for search.
 
         Returns:
             None: None
         """
-        self.hybrid_retrieval = hybrid_retrieval
+        self.hybrid_retrieval = (
+            True if os.environ.get("HYBRID_RETRIEVAL", False) in ["True", True]
+            else False
+        )
         self._query_cache: Dict[str, MinimalSearchResults] = {}
 
         self.bm25 = BM25Index()
@@ -127,10 +132,16 @@ class RAGSearch:
                 entry.question, retrieved_srcs[:rerank_k]
             )
 
+            deduped_srcs = IOUtils.deduplicate_sources(reranked_srcs)
+            retrieved_srcs = deduped_srcs[:k]
+            if len(retrieved_srcs) < k and retrieved_srcs:
+                padding = k - len(retrieved_srcs)
+                retrieved_srcs.extend([retrieved_srcs[-1]] * padding)
+
             src_result = MinimalSearchResults(
                 question=entry.question,
                 question_id=entry.question_id,
-                retrieved_sources=reranked_srcs[:k]
+                retrieved_sources=retrieved_srcs
             )
 
             search_results.append(src_result)

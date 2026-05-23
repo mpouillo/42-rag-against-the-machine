@@ -1,3 +1,5 @@
+import os
+
 from .BM25Index import BM25Index
 from .Chunker import Chunker
 from .constants import MODEL_VECTOR
@@ -12,6 +14,8 @@ class RAGIndex:
     ) -> None:
         """
         Initialize BM25 and Vector databases.
+        If environment variable "HYBRID_RETRIEVAL" is set to True,
+        uses hybrid retrieval for search computation.
 
         Args:
             index_directory (str): Path of output directory (index data)
@@ -20,8 +24,14 @@ class RAGIndex:
             None: None
         """
         self.index_dir = index_directory
+        self.hybrid_retrieval = (
+            True if os.environ.get("HYBRID_RETRIEVAL", False) in ["True", True]
+            else False
+        )
         self.bm25 = BM25Index()
-        self.vector = VectorIndex(MODEL_VECTOR)
+
+        if self.hybrid_retrieval:
+            self.vector = VectorIndex(MODEL_VECTOR)
 
     def index_and_save(
         self,
@@ -46,8 +56,11 @@ class RAGIndex:
                 + chunker.chunkify(py_docs, "python", max_chunk_size))
 
         sources = chunker.convert_docs_to_sources(docs)
+        unique_srcs = list(set(sources))
 
-        self.bm25.index(sources)
+        self.bm25.index(unique_srcs)
         self.bm25.save(self.index_dir)
-        self.vector.index(sources)
-        self.vector.save(self.index_dir)
+
+        if self.hybrid_retrieval:
+            self.vector.index(unique_srcs)
+            self.vector.save(self.index_dir)

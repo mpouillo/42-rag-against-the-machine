@@ -9,7 +9,7 @@ SEARCH_DIRECTORY = "data/output/search_results"
 VECTOR_CORPUS = "metadata_corpus.json"
 VECTOR_EMBEDDINGS = "vectors.npy"
 
-# LLM
+# Answrer
 LLM_CONTEXT_TRIM = 3
 LLM_FAILURE_ANSWER = "I'm sorry, but I couldn't find any relevant information \
 in the database to answer your question."
@@ -31,16 +31,20 @@ user while citing the source.
 """
 LLM_TEMPERATURE = 0.2
 
+# Misc
+PROMPT_CROP = 2000
+
 # Reranker
 RERANKER_CACHE_DIR = "./opt"
-RERANKER_CROP = 1500
 RERANKER_THRESHOLD = 0.5
 
 # Recall@k
 RECALL_THRESHOLD = 0.05
 
 # Models
-MODEL_VECTOR = "all-MiniLM-L6-v2"
 MODEL_ANSWER = "qwen3:0.6b"
-MODEL_RERANKER = "ms-marco-MiniLM-L-12-v2"  # Alt: "ms-marco-TinyBERT-L-2-v2"
+MODEL_RERANKER = "ms-marco-MiniLM-L-12-v2"
+# Alt: "ms-marco-TinyBERT-L-2-v2"
 MODEL_REWRITER = "en_core_web_sm"
+MODEL_VECTOR = "minishlab/potion-retrieval-32M"
+# Alt: "minishlab/potion-base-8M"

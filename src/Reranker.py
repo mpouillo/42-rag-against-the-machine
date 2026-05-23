@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Tuple
 
 from .constants import (
     RERANKER_CACHE_DIR,
-    RERANKER_CROP
+    PROMPT_CROP
 )
 from .IOUtils import IOUtils
 from .models import MinimalSource
@@ -51,14 +51,14 @@ class Reranker:
             item: Tuple[int, MinimalSource]
         ) -> Dict[str, Any]:
             """
-            Helper function to load source text (limited to RERANKER_CROP char)
+            Helper function to load source text (limited to PROMPT_CROP char)
             and return a dict of the total data.
             """
             idx, src = item
             src_data = src.model_dump()
             return {
                 "id": idx,
-                "text": IOUtils.get_text_from_file(**src_data)[:RERANKER_CROP],
+                "text": IOUtils.get_text_from_file(**src_data)[:PROMPT_CROP],
                 **src_data
             }
 

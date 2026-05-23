@@ -46,7 +46,6 @@ class BM25Index:
             )
 
         text_corpus = [
-            f"[Source file: {chunk.file_path}]\n" +
             IOUtils.get_text_from_file(**chunk.model_dump())
             for chunk in corpus
         ]

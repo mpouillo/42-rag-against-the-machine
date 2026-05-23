@@ -1,12 +1,14 @@
 import json
 import numpy
 
+from model2vec import StaticModel
 from pathlib import Path
-from sentence_transformers import SentenceTransformer
-from tqdm import tqdm
 from typing import Any, Dict, List
 
-from .constants import VECTOR_CORPUS, VECTOR_EMBEDDINGS
+from .constants import (
+    VECTOR_CORPUS,
+    VECTOR_EMBEDDINGS
+)
 from .models import MinimalSource
 
 
@@ -14,7 +16,7 @@ class VectorIndex:
     """Indexing and search pipeline using vector embeddings."""
     def __init__(
         self,
-        model: str = "all-MiniLM-L6-v2"
+        model: str = "minishlab/potion-retrieval-32M"
     ) -> None:
         """
         Initialize SentenceTransformer model and class variables
@@ -25,7 +27,7 @@ class VectorIndex:
         Returns:
             None: None
         """
-        self.model: SentenceTransformer = SentenceTransformer(model)
+        self.model = StaticModel.from_pretrained(model)
         self.embeddings: Any = None
         self.corpus: List[MinimalSource] = []
         self._cache: Dict[str, str] = {}
@@ -45,36 +47,25 @@ class VectorIndex:
         """
         if not all(isinstance(c, MinimalSource) for c in corpus):
             raise ValueError(
-                "'corpus' parameter must be a list of MinimalSource."
+                "'corpus' parameter must be a list of MinimalSource objects."
             )
         self.corpus = corpus
-        all_embeddings = []
-        chunk_size = 2000
 
-        text_corpus = []
-        for chunk in corpus:
-            path = chunk.file_path
-            start = chunk.first_character_index
-            end = chunk.last_character_index
-
+        paths = {chunk.file_path for chunk in corpus}
+        for path in paths:
             if path not in self._cache:
                 self._cache[path] = Path(path).read_text()
-            text_corpus.append(self._cache[path][start:end])
 
-        for i in tqdm(range(0, len(text_corpus), chunk_size), desc="Encoding vectors"):
-            batch_text = text_corpus[i:i + chunk_size]
+        text_corpus = [
+            self._cache[path]
+            [c.first_character_index:c.last_character_index]
+            for c in corpus
+        ]
 
-            batch_embeds = self.model.encode(
-                batch_text,
-                batch_size=64,
-                show_progress_bar=False
-            )
-            all_embeddings.append(batch_embeds)
-
-        self.embeddings = numpy.vstack(all_embeddings).astype('float32')
-
-        norms = numpy.linalg.norm(self.embeddings, axis=1, keepdims=True)
-        self.embeddings = self.embeddings / numpy.where(norms == 0, 1, norms)
+        self.embeddings = self.model.encode(
+            text_corpus,
+            show_progress_bar=True
+        ).astype('float32')
 
     def search(self, query: str, k: int) -> List[MinimalSource]:
         """
@@ -87,20 +78,21 @@ class VectorIndex:
         Returns:
             List[MinimalSource]: Top k matching results
         """
-        if self.embeddings is None:
+        if self.embeddings is None or len(self.embeddings) == 0:
             raise ValueError("Index is empty. Run .index() or .load() first.")
 
-        query_vector = self.model.encode(
-            query, convert_to_numpy=True
-        ).astype('float32')
-        query_norm = numpy.linalg.norm(query_vector)
-        if query_norm > 0:
-            query_vector = query_vector / query_norm
+        query_embedding = self.model.encode(query).astype('float32')
+        similarities = numpy.dot(self.embeddings, query_embedding)
 
-        scores = numpy.dot(self.embeddings, query_vector)
-        top_indices = numpy.argsort(scores)[::-1][:k]
+        if len(similarities) <= k:
+            top_indices = numpy.arange(len(similarities))
+        else:
+            partitioned_indices = numpy.argpartition(similarities, -k)
+            top_indices = partitioned_indices[-k:]
 
-        return [self.corpus[i] for i in top_indices]
+        top_indices = top_indices[numpy.argsort(-similarities[top_indices])]
+
+        return [self.corpus[idx] for idx in top_indices]
 
     def save(self, save_dir: str) -> None:
         """
