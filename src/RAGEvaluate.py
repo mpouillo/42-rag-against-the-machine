@@ -193,7 +193,6 @@ class RAGEvaluate:
             for t_idx, gtruth_src in enumerate(gtruth.sources):
                 for student_src in entry.retrieved_sources[:k]:
                     if self.is_source_found(student_src, gtruth_src):
-                        print(f"src {i} found")
                         unique_gtruth_found.add(t_idx)
                         break
 
