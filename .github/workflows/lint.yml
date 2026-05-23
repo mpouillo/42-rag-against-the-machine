@@ -26,4 +26,4 @@ jobs:
         run:  python3 -m flake8 .
 
       - name: Mypy strict check
-        run:  python3 -m . src --strict --warn-return-any --warn-unused-ignores --ignore-missing-imports --disallow-untyped-defs --check-untyped-defs --install-types --non-interactive
+        run:  python3 -m mypy . --strict --warn-return-any --warn-unused-ignores --ignore-missing-imports --disallow-untyped-defs --check-untyped-defs --install-types --non-interactive
