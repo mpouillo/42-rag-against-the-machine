@@ -20,10 +20,10 @@ jobs:
       - name: Install linting frameworks
         run: |
           python3 -m pip install --upgrade pip
-          python3 -m pip install flake8 mypy
+          python3 -m pip install -r requirements.txt
 
       - name: Flake8 check
-        run:  python3 -m flake8 src
+        run:  python3 -m flake8 .
 
       - name: Mypy strict check
-        run:  python3 -m mypy src --strict --warn-return-any --warn-unused-ignores --ignore-missing-imports --disallow-untyped-defs --check-untyped-defs --install-types --non-interactive
+        run:  python3 -m . src --strict --warn-return-any --warn-unused-ignores --ignore-missing-imports --disallow-untyped-defs --check-untyped-defs --install-types --non-interactive
