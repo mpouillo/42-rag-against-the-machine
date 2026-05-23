@@ -63,10 +63,11 @@ class RAGAnswer(LLMInterface):
                     return MinimalAnswer(**entry.model_dump(),
                                          answer=LLM_FAILURE_ANSWER)
 
+                full_context = "\n\n".join(context[::-1])
                 user_content = (
                     "/no_think\n"
                     f"# Instructions:\n{LLM_SYSTEM_PROMPT}\n\n\n"
-                    f"# Context:\n{'\n\n'.join(context[::-1])}\n\n\n"
+                    f"# Context:\n{full_context}\n\n\n"
                     f"# Question:\n{entry.question}\n\n\n"
                 )
 
