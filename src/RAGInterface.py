@@ -90,7 +90,7 @@ class RAGInterface(object):
         filename = dataset_path.split("/")[-1]
         save_path = f"{save_directory}/{filename}"
         IOUtils.save_object_as_json(save_path, results)
-        print(f"Saved {filename.split(".")[0]} to {save_path}")
+        print(f"Saved {filename.split('.')[0]} to {save_path}")
 
     def answer(
         self,
