@@ -1,5 +1,5 @@
 from langchain_core.documents import Document
-from langchain_text_splitters import Language, RecursiveCharacterTextSplitter
+from langchain_text_splitters import Language, MarkdownTextSplitter, RecursiveCharacterTextSplitter
 from pathlib import Path
 from typing import List
 
@@ -11,7 +11,6 @@ class Chunker:
     def chunkify(
         self,
         docs: List[Document],
-        language: str,
         max_chunk_size: int = 2000
     ) -> List[Document]:
         """
@@ -26,35 +25,9 @@ class Chunker:
         Returns:
             List[Document]: list of smaller chunks (< max_chunk_size)
         """
-        match language.lower():
-            case "python" | "py":
-                return self._chunk_python(docs, max_chunk_size)
-            case "markdown" | "md":
-                return self._chunk_markdown(docs, max_chunk_size)
-            case _:
-                return RecursiveCharacterTextSplitter(
-                    chunk_size=max_chunk_size,
-                    chunk_overlap=min(200, max_chunk_size // 5),
-                    separators=["\n\n", "\n", " ", ""],
-                    add_start_index=True,
-                    keep_separator=True
-                ).split_documents(docs)
+        if max_chunk_size <= 0:
+            raise ValueError("max_chunk_size must be a positive non-zero integer")
 
-    def _chunk_python(
-        self,
-        docs: List[Document],
-        max_chunk_size: int
-    ) -> List[Document]:
-        """
-        Split python file documents.
-
-        Args:
-            docs (List[Document]): List of Document objects to be split
-            max_chunk_size (int): Maximum size of output chunks
-
-        Returns:
-            List[Document]: list of smaller chunks (< max_chunk_size)
-        """
         split_docs = []
         while max_chunk_size >= 200:
             split_docs += RecursiveCharacterTextSplitter.from_language(
@@ -66,25 +39,7 @@ class Chunker:
                 ).split_documents(docs)
             max_chunk_size = max_chunk_size // 2
 
-        return split_docs
-
-    def _chunk_markdown(
-        self,
-        docs: List[Document],
-        max_chunk_size: int
-    ) -> List[Document]:
-        """
-        Split markdown file documents.
-
-        Args:
-            docs (List[Document]): List of Document objects to be split
-            max_chunk_size (int): Maximum size of output chunks
-
-        Returns:
-            List[Document]: list of smaller chunks (< max_chunk_size)
-        """
-        split_docs = []
-        while max_chunk_size >= 200:
+        if not split_docs:
             split_docs += RecursiveCharacterTextSplitter.from_language(
                     language=Language.PYTHON,
                     chunk_size=max_chunk_size,
@@ -92,7 +47,6 @@ class Chunker:
                     add_start_index=True,
                     keep_separator=True
                 ).split_documents(docs)
-            max_chunk_size = max_chunk_size // 2
 
         return split_docs
 
@@ -114,9 +68,10 @@ class Chunker:
         """
         path = Path(dir_path)
         if not path.is_dir():
-            raise ValueError("input directory not found")
-        if not path.rglob('*'):
-            raise ValueError("no files to ingest")
+            raise ValueError("Input directory not found")
+
+        if not list(path.rglob(pattern)):
+            raise ValueError("No files to ingest")
 
         return [
             Document(page_content=file.read_text(),

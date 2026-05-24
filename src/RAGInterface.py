@@ -1,5 +1,6 @@
 import asyncio
 import json
+import sys
 
 from .constants import (
     INDEX_DIRECTORY,
@@ -35,6 +36,11 @@ class RAGInterface(object):
         Returns:
             None: None
         """
+        try:
+            size = int(max_chunk_size)
+        except Exception:
+            sys.exit("'max_chunk_size' value must be an integer")
+
         indexer = RAGIndex(INDEX_DIRECTORY)
         indexer.index_and_save(max_chunk_size, INGEST_DIRECTORY)
         print(f"Ingestion complete! Indices saved under {INDEX_DIRECTORY}")
@@ -153,11 +159,11 @@ class RAGInterface(object):
         max_context_length: int
     ) -> None:
         """
-        Evaluate student search results based on comparison dataset.
+        Evaluate student search results based on reference dataset.
 
         Args:
             student_answer_path (str): Path to the dataset to process
-            dataset_path (str): Path to the comparison dataset to process
+            dataset_path (str): Path to the reference dataset to process
             k (int): The number of sources to be provided
             max_chunk_size (int): Maximum size of output chunks
 

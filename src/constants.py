@@ -29,13 +29,13 @@ user while citing the source.
 4. Omit any thinking (e.g., <think> tags) or reasoning (e.g., "Based on...").
 5. Keep the response clear, precise, natural, and under 5 sentences.
 """
-LLM_TEMPERATURE = 0.2
+LLM_TEMPERATURE = 0.4
 
 # Misc
 PROMPT_CROP = 2000
 
 # Reranker
-RERANKER_CACHE_DIR = "./opt"
+RERANKER_CACHE_DIR = "./.flashrank_cache"
 RERANKER_THRESHOLD = 0.5
 
 # Recall@k

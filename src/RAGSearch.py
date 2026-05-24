@@ -110,8 +110,11 @@ class RAGSearch:
             StudentSearchResults: Pydantic object containing the input
             dataset with retrieved sources appended
         """
-        pool = max(k * 10, 50)
-        rerank_k = k * 2
+        pool = len(self.bm25.retriever.corpus)
+        if self.hybrid_retrieval:
+            rerank_k = max(10, k * 4)
+        else:
+            rerank_k = max(10, k * 2)
 
         search_results = []
         for entry in tqdm(dataset.rag_questions, desc="Processing queries"):

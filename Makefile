@@ -50,7 +50,7 @@ test-all:
 
 test-index:
 	@echo "Testing index..."
-	@$(UV) run python -m $(SRC) index --max_chunk_size=$(CONTEXT_LENGTH)
+	@$(UV) run python -m $(SRC) index --max_chunk_size $(CONTEXT_LENGTH)
 
 test-search: start-server
 	@echo "Testing search..."
@@ -91,19 +91,17 @@ lint-strict:
 
 clean:
 	@if [ -n "$$(find . -type d \( -name ".mypy_cache" -o -name "__pycache__" \
-	-o -name ".uv_cache" -o -name ".pytest_cache" \) -print -quit)" ]; then \
+	-o -name ".uv_cache" -o -name ".pytest_cache" -o -name ".flashrank_cache" \) -print -quit)" ]; then \
 		echo "Cleaning cache files..."; \
 		find . -type d \( -name ".mypy_cache" -o -name "__pycache__" -o -name \
-		".uv_cache" -o -name ".pytest_cache" \) -exec rm -rf {} +; \
+		".uv_cache" -o -name ".pytest_cache" -o -name ".flashrank_cache" \) -exec rm -rf {} +; \
 	fi
 
 fclean: clean
 	@echo "Removing virtual environment..."
 	$(RM) -r $(UV_PROJECT_ENVIRONMENT)
-	@echo "Removing cache directory..."
-	$(RM) -r opt
 
 re: fclean all
 
-.PHONY: all install test debug lint lint-strict clean fclean re sync start-server
+.PHONY: all install debug lint lint-strict clean fclean re sync start-server stop-server test-all test-index test-search test-answer test-evaluate
 .DEFAULT_GOAL = all
