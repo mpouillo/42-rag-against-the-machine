@@ -25,7 +25,7 @@ class BM25Index:
             None: None
         """
         self.stemmer: Stemmer.Stemmer = Stemmer.Stemmer("english")
-        self.retriever: bm25s.BM25 | None = None
+        self.retriever: bm25s.BM25 = None
 
     def index(
         self,

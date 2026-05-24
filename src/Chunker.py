@@ -1,5 +1,5 @@
 from langchain_core.documents import Document
-from langchain_text_splitters import Language, MarkdownTextSplitter, RecursiveCharacterTextSplitter
+from langchain_text_splitters import Language, RecursiveCharacterTextSplitter
 from pathlib import Path
 from typing import List
 
@@ -26,7 +26,9 @@ class Chunker:
             List[Document]: list of smaller chunks (< max_chunk_size)
         """
         if max_chunk_size <= 0:
-            raise ValueError("max_chunk_size must be a positive non-zero integer")
+            raise ValueError(
+                "'max_chunk_size' must be a positive non-zero integer"
+            )
 
         split_docs = []
         while max_chunk_size >= 200:

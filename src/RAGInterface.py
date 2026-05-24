@@ -1,6 +1,5 @@
 import asyncio
 import json
-import sys
 
 from .constants import (
     INDEX_DIRECTORY,
@@ -37,9 +36,13 @@ class RAGInterface(object):
             None: None
         """
         try:
-            size = int(max_chunk_size)
-        except Exception:
-            sys.exit("'max_chunk_size' value must be an integer")
+            max_chunk_size = int(max_chunk_size)
+            if max_chunk_size < 1:
+                raise ValueError
+        except ValueError:
+            raise ValueError(
+                "'max_chunk_size' must be a positive non-zero integer"
+            )
 
         indexer = RAGIndex(INDEX_DIRECTORY)
         indexer.index_and_save(max_chunk_size, INGEST_DIRECTORY)
@@ -60,6 +63,15 @@ class RAGInterface(object):
         Returns:
             str: JSOn-formatted string of the retrieved StudentSearchResults.
         """
+        query = str(query)
+
+        try:
+            k = int(k)
+            if k < 1:
+                raise ValueError
+        except ValueError:
+            raise ValueError("'k' must be a positive non-zero integer")
+
         searcher = RAGSearch(INDEX_DIRECTORY)
         dataset = RagDataset(
             rag_questions=[
@@ -89,6 +101,16 @@ class RAGInterface(object):
             None: JSOn-formatted string of the retrieved StudentSearchResults
             saved to file.
         """
+        dataset_path = str(dataset_path)
+        save_directory = str(save_directory)
+
+        try:
+            k = int(k)
+            if k < 1:
+                raise ValueError
+        except ValueError:
+            raise ValueError("'k' must be a positive non-zero integer")
+
         searcher = RAGSearch(INDEX_DIRECTORY)
         dataset = IOUtils.load_json_as_model(dataset_path, RagDataset)
         results = searcher.search_dataset(dataset, k)
@@ -115,6 +137,15 @@ class RAGInterface(object):
             str: JSOn-formatted string of the retrieved
             StudentSearchResultsAndAnswer.
         """
+        query = str(query)
+
+        try:
+            k = int(k)
+            if k < 1:
+                raise ValueError
+        except ValueError:
+            raise ValueError("'k' must be a positive non-zero integer")
+
         results = StudentSearchResults(**json.loads(self.search(query, k)))
         answers = asyncio.run(RAGAnswer(MODEL_ANSWER).answer_dataset(results))
         return answers.model_dump_json(indent=4)
@@ -136,6 +167,9 @@ class RAGInterface(object):
             None: JSOn-formatted string of the retrieved
             StudentSearchResultsAndAnswer saved to file.
         """
+        student_search_results_path = str(student_search_results_path)
+        save_directory = str(save_directory)
+
         dataset = IOUtils.load_json_as_model(
             student_search_results_path, StudentSearchResults
         )
@@ -170,6 +204,25 @@ class RAGInterface(object):
         Returns:
             None: Terminal output of the evaluation results.
         """
+        student_answer_path = str(student_answer_path)
+        dataset_path = str(dataset_path)
+
+        try:
+            k = int(k)
+            if k < 1:
+                raise ValueError
+        except ValueError:
+            raise ValueError("'k' must be a positive non-zero integer")
+
+        try:
+            max_context_length = int(max_context_length)
+            if max_context_length < 1:
+                raise ValueError
+        except ValueError:
+            raise ValueError(
+                "'max_context_length' must be a positive non-zero integer"
+            )
+
         evaluator = RAGEvaluate(student_answer_path, dataset_path)
         evaluator.validate(k, max_context_length)
         print()

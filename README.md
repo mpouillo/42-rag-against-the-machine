@@ -187,7 +187,7 @@ flowchart TB
 
 - Recall@k:
 	- This metric was VERY hard to increase as the provided reference dataset only contains a single source, set in stone. Without knowing how it was obtained, it is very difficult to tweak the RAG pipeline to obtain results that are not simply better and more relevant to the user's query, but instead closer to the reference dataset's retrieved sources.
-	- The recall@5 score to aim for was 80% on docs questions and 50% on code, and I could not get any higher than 88% and 56% after a LOT of tweaking. Many of my attempts to increase recall by adding better indexing and search methods actually led to worse scores, which was very frustrating. In the end, only the simplest methods gave decent results, since this is probably how the reference dataset's sources were obtained.
+	- The recall@5 score to aim for was 80% on docs questions and 50% on code, and I could not get any higher than 90% and 56% after a LOT of tweaking. Many of my attempts to increase recall by adding better indexing and search methods actually led to worse scores, which was very frustrating. In the end, only the simplest methods gave decent results, since this is probably how the reference dataset's sources were obtained.
 
 ### Example usage
 

@@ -135,7 +135,10 @@ class RAGSearch:
                 entry.question, retrieved_srcs[:rerank_k]
             )
 
-            deduped_srcs = IOUtils.deduplicate_sources(reranked_srcs)
+            deduped_srcs = IOUtils.deduplicate_sources(
+                reranked_srcs
+            )
+
             retrieved_srcs = deduped_srcs[:k]
             if len(retrieved_srcs) < k and retrieved_srcs:
                 padding = k - len(retrieved_srcs)

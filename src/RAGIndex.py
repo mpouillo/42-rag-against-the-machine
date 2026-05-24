@@ -1,5 +1,3 @@
-import os
-
 from .BM25Index import BM25Index
 from .Chunker import Chunker
 from .constants import MODEL_VECTOR
@@ -50,7 +48,9 @@ class RAGIndex:
         unique_srcs = list(set(sources))
 
         if len(unique_srcs) < 1:
-            raise ValueError("No chunks computed, try increasing 'max_chunk_size'.")
+            raise ValueError(
+                "No chunks computed, try increasing 'max_chunk_size'"
+            )
 
         self.bm25.index(unique_srcs)
         self.bm25.save(self.index_dir)
