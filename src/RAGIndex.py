@@ -39,10 +39,11 @@ class RAGIndex:
             None: None
         """
         chunker = Chunker()
-        py_docs = chunker.parse_dir(input_dir, "*.py")
-        md_docs = chunker.parse_dir(input_dir, "*.md")
+        docs = chunker.parse_dir(input_dir, "*.py")
+        docs += chunker.parse_dir(input_dir, "*.md")
+        docs += chunker.parse_dir(input_dir, "*.txt")
 
-        docs = chunker.chunkify(md_docs + py_docs, max_chunk_size)
+        docs = chunker.chunkify(docs, max_chunk_size)
 
         sources = chunker.convert_docs_to_sources(docs)
         unique_srcs = list(set(sources))

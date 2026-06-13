@@ -57,7 +57,7 @@ class VectorIndex:
                 self._cache[path] = Path(path).read_text()
 
         text_corpus = [
-            self._cache[path]
+            self._cache[c.file_path]
             [c.first_character_index:c.last_character_index]
             for c in corpus
         ]

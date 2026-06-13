@@ -1,12 +1,12 @@
 import bm25s
 import json
+import re
 import Stemmer
 
 from pathlib import Path
-from typing import List
+from typing import Dict, List, Optional
 
 from .constants import BM25_CORPUS, BM25_DIRECTORY
-from .IOUtils import IOUtils
 from .models import MinimalSource
 
 
@@ -25,7 +25,8 @@ class BM25Index:
             None: None
         """
         self.stemmer: Stemmer.Stemmer = Stemmer.Stemmer("english")
-        self.retriever: bm25s.BM25 = None
+        self.retriever: Optional[bm25s.BM25] = None
+        self._cache: Dict[str, str] = {}
 
     def index(
         self,
@@ -45,9 +46,18 @@ class BM25Index:
                 "'corpus' parameter must be a list of MinimalSource."
             )
 
+        paths = {chunk.file_path for chunk in corpus}
+        for path in paths:
+            if path not in self._cache:
+                self._cache[path] = Path(path).read_text()
+
         text_corpus = [
-            IOUtils.get_text_from_file(**chunk.model_dump())
-            for chunk in corpus
+            self._breakup_words(
+                self._cache[c.file_path]
+                [c.first_character_index:c.last_character_index]
+            )
+            + f"\n{c.file_path}"
+            for c in corpus
         ]
 
         corpus_tokens = bm25s.tokenize(
@@ -93,7 +103,7 @@ class BM25Index:
         Returns:
             None: None
         """
-        if not self.retriever:
+        if not self.retriever or not self.retriever.corpus:
             raise ValueError("Index is empty. Run .index() or .load() first.")
 
         json_corpus = [c.model_dump() for c in self.retriever.corpus]
@@ -138,3 +148,15 @@ class BM25Index:
                 "or data is not a list of MinimalSources. "
                 f"Details: {e}"
             )
+
+    def _breakup_words(self, text: str) -> str:
+        broken_words: List[str] = []
+        for word in text.split():
+            broken_words.append(word)
+            if '_' in word:
+                broken_words.extend([p for p in word.split('_') if p])
+            camel_parts = re.findall(r'[a-zA-Z][a-z]*', word)
+            if len(camel_parts) > 1:
+                broken_words.extend([p.lower() for p in camel_parts])
+
+        return " ".join(broken_words)

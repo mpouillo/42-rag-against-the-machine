@@ -43,7 +43,7 @@ class IOUtils:
     @staticmethod
     def save_object_as_json(
         file_path: str,
-        obj: T
+        obj: BaseModel
     ) -> None:
         """
         Save Pydantic object to file.
@@ -119,7 +119,6 @@ class IOUtils:
             src.last_character_index - src.first_character_index
             for src in sources
         )
-        print(max_chunk_size)
 
         file_groups = defaultdict(list)
         for src in sources:

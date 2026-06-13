@@ -110,7 +110,10 @@ class RAGSearch:
             StudentSearchResults: Pydantic object containing the input
             dataset with retrieved sources appended
         """
-        pool = len(self.bm25.retriever.corpus)
+        pool = k
+        if self.bm25.retriever and self.bm25.retriever.corpus:
+            pool = max(k, len(self.bm25.retriever.corpus) // 2)
+
         if self.hybrid_retrieval:
             rerank_k = max(10, k * 4)
         else:
