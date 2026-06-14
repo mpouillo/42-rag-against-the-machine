@@ -10,7 +10,6 @@ from .constants import (
     MODEL_REWRITER,
     MODEL_VECTOR
 )
-from .IOUtils import IOUtils
 from .models import (
     MinimalSearchResults,
     MinimalSource,
@@ -110,14 +109,12 @@ class RAGSearch:
             StudentSearchResults: Pydantic object containing the input
             dataset with retrieved sources appended
         """
-        pool = k
         if self.bm25.retriever and self.bm25.retriever.corpus:
             pool = max(k, len(self.bm25.retriever.corpus) // 2)
-
-        if self.hybrid_retrieval:
-            rerank_k = max(10, k * 4)
         else:
-            rerank_k = max(10, k * 2)
+            raise ValueError("No corpus found. Please run 'index' first.")
+
+        rerank_k = max(10, k * 4)
 
         search_results = []
         for entry in tqdm(dataset.rag_questions, desc="Processing queries"):
@@ -138,11 +135,11 @@ class RAGSearch:
                 entry.question, retrieved_srcs[:rerank_k]
             )
 
-            deduped_srcs = IOUtils.deduplicate_sources(
-                reranked_srcs
-            )
+            # unique_srcs = IOUtils.deduplicate_sources_and_keep_order(
+            #     reranked_srcs
+            # )
 
-            retrieved_srcs = deduped_srcs[:k]
+            retrieved_srcs = reranked_srcs[:k]
             if len(retrieved_srcs) < k and retrieved_srcs:
                 padding = k - len(retrieved_srcs)
                 retrieved_srcs.extend([retrieved_srcs[-1]] * padding)
