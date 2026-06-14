@@ -43,7 +43,7 @@ RECALL_THRESHOLD = 0.05
 
 # Models
 MODEL_ANSWER = "qwen3:0.6b"
-MODEL_RERANKER = "ms-marco-MiniLM-L-12-v2"
+MODEL_RERANKER = "ms-marco-TinyBERT-L-2-v2"
 # Slow: "ms-marco-MiniLM-L-12-v2"
 # Fast: "ms-marco-TinyBERT-L-2-v2"
 MODEL_REWRITER = "en_core_web_sm"
