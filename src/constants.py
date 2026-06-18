@@ -10,7 +10,7 @@ VECTOR_CORPUS = "metadata_corpus.json"
 VECTOR_EMBEDDINGS = "vectors.npy"
 
 # Answerer
-LLM_CONTEXT_TRIM = 3
+LLM_CONTEXT_TRIM = 1
 LLM_FAILURE_ANSWER = "I'm sorry, but I couldn't find any relevant information \
 in the database to answer your question."
 LLM_NUM_PREDICT = 1024

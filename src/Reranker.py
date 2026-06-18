@@ -31,48 +31,12 @@ class Reranker:
             log_level="ERROR"
         )
 
-    def _load_passages(
-        self,
-        sources: List[MinimalSource]
-    ) -> List[Dict[str, Any]]:
-        """
-        Helper function to load corpus from sources.
-
-        Args:
-            sources (list[MinimalSource]): List of sources to load
-
-        Returns:
-            List[Dict[str, Any]]: Corpus of sources with added text data
-        """
-        if not sources:
-            return []
-
-        def load_passage(
-            item: Tuple[int, MinimalSource]
-        ) -> Dict[str, Any]:
-            """
-            Helper function to load source text (limited to PROMPT_CROP char)
-            and return a dict of the total data.
-            """
-            idx, src = item
-            src_data = src.model_dump()
-            return {
-                "id": idx,
-                "text": IOUtils.get_text_from_file(**src_data)[:PROMPT_CROP],
-                **src_data
-            }
-
-        with ThreadPoolExecutor(max_workers=10) as executor:
-            passages = list(executor.map(load_passage, enumerate(sources)))
-
-        return passages
-
     def rerank_sources(
         self,
         query: str,
-        sources: List[MinimalSource],
+        sources: List[Dict[str, Any]],
         min_score: float = -1
-    ) -> List[MinimalSource]:
+    ) -> List[Dict[str, Any]]:
         """
         Rerank sources based on LLM scoring.
 
@@ -85,15 +49,9 @@ class Reranker:
             List[MinimalSource]: List of reranked sources
         """
 
-        passages = self._load_passages(sources)
-        rerank_request = RerankRequest(query=query, passages=passages)
+        for idx, source in enumerate(sources):
+            source["id"] = idx
+        rerank_request = RerankRequest(query=query, passages=sources)
         reranked_results = self.ranker.rerank(rerank_request)
 
-        return [
-            MinimalSource(
-                file_path=result["file_path"],
-                first_character_index=result["first_character_index"],
-                last_character_index=result["last_character_index"]
-            )
-            for result in reranked_results if result["score"] >= min_score
-        ]
+        return reranked_results

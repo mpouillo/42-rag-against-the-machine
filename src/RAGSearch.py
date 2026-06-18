@@ -1,31 +1,27 @@
-import os
-
 from collections import defaultdict
 from tqdm import tqdm
 from typing import Any, Dict, List
 
-from .BM25Index import BM25Index
-from .constants import (
-    MODEL_RERANKER,
-    MODEL_REWRITER,
-    MODEL_VECTOR
-)
+from src.constants import MODEL_RERANKER
+
+from .Reranker import Reranker
+
+from .BM25Search import BM25Searcher
+from .ChromaSearch import ChromaSearcher
+
 from .models import (
     MinimalSearchResults,
     MinimalSource,
     RagDataset,
     StudentSearchResults
 )
-from .QueryRewriter import QueryRewriter
-from .Reranker import Reranker
-from .VectorIndex import VectorIndex
 
 
 class RAGSearch:
     """Core RAG class used to search indices for relevant sources."""
     def __init__(
         self,
-        index_directory: str,
+        index_dir: str,
     ) -> None:
         """
         Initialize indices and query rewriter.
@@ -38,27 +34,16 @@ class RAGSearch:
         Returns:
             None: None
         """
-        self.hybrid_retrieval = (
-            True if os.environ.get("HYBRID_RETRIEVAL", False) in ["True", True]
-            else False
-        )
-        self._query_cache: Dict[str, MinimalSearchResults] = {}
-
-        self.bm25 = BM25Index()
+        self.bm25 = BM25Searcher(index_dir)
+        self.chroma = ChromaSearcher(index_dir)
         self.reranker = Reranker(MODEL_RERANKER)
-        self.rewriter = QueryRewriter(MODEL_REWRITER)
-
-        self.bm25.load(index_directory)
-
-        if self.hybrid_retrieval:
-            self.vector = VectorIndex(MODEL_VECTOR)
-            self.vector.load(index_directory)
+        self._cache: Dict[str, MinimalSearchResults] = {}
 
     def compute_rrf(
         self,
-        source_lists: List[List[MinimalSource]],
+        source_lists: List[List[Dict[str, Any]]],
         rrf_k: float = 60.0
-    ) -> List[MinimalSource]:
+    ) -> List[Dict[str, Any]]:
         """
         Compute RRF (Reciprocal Rank Fusion) scores for each list of
         MinimalSource objects and sort them.
@@ -77,9 +62,9 @@ class RAGSearch:
         for source_list in source_lists:
             for rank, src in enumerate(source_list, start=1):
                 footprint = (
-                    src.file_path,
-                    src.first_character_index,
-                    src.last_character_index
+                    src.get("file_path"),
+                    src.get("first_character_index"),
+                    src.get("last_character_index")
                 )
                 rrf_scores[footprint] += 1.0 / (rrf_k + rank)
                 source_map[footprint] = src
@@ -109,48 +94,37 @@ class RAGSearch:
             StudentSearchResults: Pydantic object containing the input
             dataset with retrieved sources appended
         """
-        if self.bm25.retriever and self.bm25.retriever.corpus:
-            pool = max(k, len(self.bm25.retriever.corpus) // 2)
-        else:
-            raise ValueError("No corpus found. Please run 'index' first.")
-
-        rerank_k = max(10, k * 4)
-
         search_results = []
-        for entry in tqdm(dataset.rag_questions, desc="Processing queries"):
-            if entry.question in self._query_cache:
-                search_results.append(self._query_cache[entry.question])
-                continue
 
-            query = self.rewriter.rewrite_query(entry.question)
-            bm25_srcs = self.bm25.search(query, pool)
+        for entry in tqdm(
+            dataset.rag_questions,
+            desc="Searching database..."
+        ):
+            query = entry.question
+            bm25_results = self.bm25.search(query, 1000)
+            chroma_results = self.chroma.search(query, 1000)
+            rrf_results = self.compute_rrf([bm25_results, chroma_results])
+            reranked_results = self.reranker.rerank_sources(query, rrf_results[:k * 2])
+            minimal_sources = [
+                MinimalSource(
+                    file_path=src.get("file_path", ""),
+                    first_character_index=src.get("first_character_index", 0),
+                    last_character_index=src.get("last_character_index", 0)
+                )
+                for src in reranked_results
+            ][:k]
 
-            if self.hybrid_retrieval:
-                vector_srcs = self.vector.search(query, pool)
-                retrieved_srcs = self.compute_rrf([bm25_srcs, vector_srcs])
-            else:
-                retrieved_srcs = bm25_srcs
+            if minimal_sources and len(minimal_sources) < k:
+                padding = k - len(minimal_sources)
+                minimal_sources.extend([minimal_sources[-1]] * padding)
 
-            reranked_srcs = self.reranker.rerank_sources(
-                entry.question, retrieved_srcs[:rerank_k]
-            )
-
-            # unique_srcs = IOUtils.deduplicate_sources_and_keep_order(
-            #     reranked_srcs
-            # )
-
-            retrieved_srcs = reranked_srcs[:k]
-            if len(retrieved_srcs) < k and retrieved_srcs:
-                padding = k - len(retrieved_srcs)
-                retrieved_srcs.extend([retrieved_srcs[-1]] * padding)
-
-            src_result = MinimalSearchResults(
+            result = MinimalSearchResults(
                 question=entry.question,
                 question_id=entry.question_id,
-                retrieved_sources=retrieved_srcs
+                retrieved_sources=minimal_sources
             )
 
-            search_results.append(src_result)
-            self._query_cache[entry.question] = src_result
+            search_results.append(result)
+            self._cache[query] = result
 
         return StudentSearchResults(search_results=search_results, k=k)

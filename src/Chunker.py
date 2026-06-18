@@ -1,109 +1,160 @@
-from langchain_core.documents import Document
-from langchain_text_splitters import Language, RecursiveCharacterTextSplitter
-from pathlib import Path
+import ast
+import re
+
 from typing import List
 
-from .models import MinimalSource
+from .models import CodeChunk, MinimalSource
 
 
-class Chunker:
-    """Class enabling parsing of text chunks into MinimalSource objects."""
-    def chunkify(
-        self,
-        docs: List[Document],
-        max_chunk_size: int = 2000
-    ) -> List[Document]:
-        """
-        Split a list of Document objects into chunks of maximum
-        max_chunk_size characters, depending on data language.
+def chunk_python_file(
+    file_path: str,
+    source_code: str,
+    max_chunk_size: int = 2000
+) -> List[CodeChunk]:
+    chunks = []
 
-        Args:
-            docs (List[Document]): List of Document objects to be split
-            language (str): Language of docs
-            max_chunk_size (int): Maximum size of output chunks
+    try:
+        tree = ast.parse(source_code)
+    except SyntaxError:
+        return fallback_line_chunker(file_path, source_code, max_chunk_size)
 
-        Returns:
-            List[Document]: list of smaller chunks (< max_chunk_size)
-        """
-        if max_chunk_size <= 0:
-            raise ValueError(
-                "'max_chunk_size' must be a positive non-zero integer"
-            )
+    lines = source_code.splitlines(keepends=True)
+    line_offsets = [0]
+    for line in lines:
+        line_offsets.append(line_offsets[-1] + len(line))
 
-        split_docs = []
-        while max_chunk_size >= 200:
-            split_docs += RecursiveCharacterTextSplitter.from_language(
-                    language=Language.PYTHON,
-                    chunk_size=max_chunk_size,
-                    chunk_overlap=max_chunk_size // 4,
-                    add_start_index=True,
-                    keep_separator=True
-                ).split_documents(docs)
-            max_chunk_size = max_chunk_size // 2
+    def get_char_indices(node: ast.AST) -> tuple[int, int]:
+        start_line = getattr(node, "lineno", 1) - 1
+        end_line = getattr(node, "end_lineno", start_line + 1) - 1
 
-        if not split_docs:
-            split_docs += RecursiveCharacterTextSplitter.from_language(
-                    language=Language.PYTHON,
-                    chunk_size=max_chunk_size,
-                    chunk_overlap=max_chunk_size // 4,
-                    add_start_index=True,
-                    keep_separator=True
-                ).split_documents(docs)
+        start_char = line_offsets[start_line] + getattr(node, "col_offset", 0)
+        end_char = line_offsets[end_line] + (
+            getattr(node, "end_col_offset", len(lines[end_line]))
+        )
+        return start_char, end_char
 
-        return split_docs
+    for node in tree.body:
+        if isinstance(node, (
+            ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef
+        )):
+            start_idx, end_idx = get_char_indices(node)
+            entity_text = source_code[start_idx:end_idx]
 
-    @staticmethod
-    def parse_dir(
-        dir_path: str,
-        pattern: str
-    ) -> List[Document]:
-        """
-        Read all files in a directory matching a pattern
-        and return them as a list of Document objects.
+            lineage = f"File: {file_path}\n"
+            if isinstance(node, ast.ClassDef):
+                lineage += f"Class: {node.name}\n"
+            else:
+                lineage += f"Function: {node.name}\n"
 
-        Args:
-            dir_path (str): Path of directory to ingest
-            pattern (str): Pattern of files to ingest
+            full_indexed_text = lineage + "\n" + entity_text
 
-        Returns:
-            List[Document]: list of files parsed as Document objects.
-        """
-        path = Path(dir_path)
-        if not path.is_dir():
-            raise ValueError("Input directory not found")
+            if len(full_indexed_text) <= max_chunk_size:
+                chunks.append(CodeChunk(
+                    text=full_indexed_text,
+                    source=MinimalSource(
+                        file_path=file_path,
+                        first_character_index=start_idx,
+                        last_character_index=end_idx
+                    )
+                ))
+            else:
+                overlap = 400
+                step = max_chunk_size - overlap - len(lineage)
 
-        if not list(path.rglob(pattern)):
-            raise ValueError("No files to ingest")
+                for i in range(0, len(entity_text), step):
+                    sub_text = entity_text[
+                        i:i + max_chunk_size - len(lineage)
+                    ]
+                    chunk_start = start_idx + i
+                    chunk_end = min(chunk_start + len(sub_text), end_idx)
 
-        return [
-            Document(page_content=file.read_text(),
-                     metadata={"path": str(file)})
-            for file in path.rglob(pattern) if file.is_file()
-        ]
+                    chunks.append(CodeChunk(
+                        text=lineage + "\n" + sub_text,
+                        source=MinimalSource(
+                            file_path=file_path,
+                            first_character_index=chunk_start,
+                            last_character_index=chunk_end
+                        )
+                    ))
+                    if chunk_end == end_idx:
+                        break
+    return chunks
 
-    @staticmethod
-    def convert_docs_to_sources(
-        docs: List[Document]
-    ) -> List[MinimalSource]:
-        """
-        Convert a list of Document objects to a list of MinimalSource objects.
 
-        Args:
-            docs (List[Document]): List of Document objects to be converted
+def chunk_markdown_file(
+    file_path: str,
+    text: str,
+    max_chunk_size: int = 2000
+) -> List[CodeChunk]:
+    chunks = []
+    heading_pattern = re.compile(r'^(#{1,6})\s+(.+)$', re.MULTILINE)
 
-        Return:
-            List[MinimalSource]: List of converted MinimalSource objects
-        """
-        sources = []
-        for doc in docs:
-            file_path = doc.metadata.get("path", "")
-            start = doc.metadata.get("start_index", 0)
-            end = start + len(doc.page_content)
+    matches = list(heading_pattern.finditer(text))
+    if not matches:
+        return fallback_line_chunker(file_path, text, max_chunk_size)
 
-            sources.append(MinimalSource(
+    for idx, match in enumerate(matches):
+        start_idx = match.start()
+        end_idx = (
+            matches[idx + 1].start() if idx + 1 < len(matches) else len(text)
+        )
+
+        section_text = text[start_idx:end_idx]
+        heading_title = match.group(2)
+
+        metadata_header = f"File: {file_path}\nSection: {heading_title}\n\n"
+        full_indexed_text = metadata_header + section_text
+
+        if len(full_indexed_text) <= max_chunk_size:
+            chunks.append(CodeChunk(
+                text=full_indexed_text,
+                source=MinimalSource(
+                    file_path=file_path,
+                    first_character_index=start_idx,
+                    last_character_index=end_idx
+                )
+            ))
+        else:
+            overlap = 300
+            step = max_chunk_size - overlap - len(metadata_header)
+            for i in range(0, len(section_text), step):
+                sub_text = section_text[
+                    i:i + max_chunk_size - len(metadata_header)
+                ]
+                chunk_start = start_idx + i
+                chunk_end = min(chunk_start + len(sub_text), end_idx)
+
+                chunks.append(CodeChunk(
+                    text=metadata_header + sub_text,
+                    source=MinimalSource(
+                        file_path=file_path,
+                        first_character_index=chunk_start,
+                        last_character_index=chunk_end
+                    )
+                ))
+                if chunk_end == end_idx:
+                    break
+    return chunks
+
+
+def fallback_line_chunker(
+    file_path: str,
+    text: str,
+    max_chunk_size: int
+) -> List[CodeChunk]:
+    chunks = []
+    overlap = 300
+    start = 0
+    while start < len(text):
+        end = min(start + max_chunk_size, len(text))
+        chunks.append(CodeChunk(
+            text=f"File: {file_path}\n\n" + text[start:end],
+            source=MinimalSource(
                 file_path=file_path,
                 first_character_index=start,
-                last_character_index=end
-            ))
-
-        return sources
+                last_character_index=end)
+        ))
+        if end == len(text):
+            break
+        start += (max_chunk_size - overlap)
+    return chunks
