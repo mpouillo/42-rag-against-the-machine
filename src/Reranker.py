@@ -1,13 +1,7 @@
-from concurrent.futures import ThreadPoolExecutor
 from flashrank import Ranker, RerankRequest
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, cast
 
-from .constants import (
-    RERANKER_CACHE_DIR,
-    PROMPT_CROP
-)
-from .IOUtils import IOUtils
-from .models import MinimalSource
+from .constants import RERANKER_CACHE_DIR
 
 
 class Reranker:
@@ -54,4 +48,4 @@ class Reranker:
         rerank_request = RerankRequest(query=query, passages=sources)
         reranked_results = self.ranker.rerank(rerank_request)
 
-        return reranked_results
+        return cast(List[Dict[str, Any]], reranked_results)
