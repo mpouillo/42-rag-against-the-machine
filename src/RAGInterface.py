@@ -77,7 +77,7 @@ class RAGInterface(object):
                 UnansweredQuestion(question=query)
             ]
         )
-        results = searcher.search_dataset(dataset, k)
+        results = asyncio.run(searcher.search_dataset(dataset, k))
         return results.model_dump_json(indent=4)
 
     def search_dataset(
@@ -112,7 +112,7 @@ class RAGInterface(object):
 
         searcher = RAGSearch(INDEX_DIRECTORY)
         dataset = IOUtils.load_json_as_model(dataset_path, RagDataset)
-        results = searcher.search_dataset(dataset, k)
+        results = asyncio.run(searcher.search_dataset(dataset, k))
 
         filename = dataset_path.split("/")[-1]
         save_path = f"{save_directory}/{filename}"
