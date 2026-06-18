@@ -46,3 +46,8 @@ class StudentSearchResults(BaseModel):
 
 class StudentSearchResultsAndAnswer(StudentSearchResults):
     search_results: Sequence[MinimalAnswer]
+
+
+class CodeChunk(BaseModel):
+    text: str
+    source: MinimalSource

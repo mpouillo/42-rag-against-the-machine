@@ -1,60 +1,53 @@
-from .BM25Index import BM25Index
-from .Chunker import Chunker
-from .constants import MODEL_VECTOR
-from .VectorIndex import VectorIndex
+from pathlib import Path
+
+from .BM25Index import bm25_index_and_save
+from .Chunker import chunk_markdown_file, chunk_python_file
+from .ChromaIndex import chroma_index_and_save
 
 
-class RAGIndex:
-    """Core RAG class used to ingest and index a directory of files."""
-    def __init__(
-        self,
-        index_directory: str
-    ) -> None:
-        """
-        Initialize BM25 and Vector databases.
+def ingest_and_index(
+    max_chunk_size: int,
+    input_dir: str = "./data/raw/",
+    index_dir: str = "./data/processed/"
+) -> None:
+    """
+    Ingest, index and save to file a directory's data.
 
-        Args:
-            index_directory (str): Path of output directory (index data)
+    Args:
+        max_chunk_size (int): Maximum size of output chunks
+        input_dir (str): Path of input directory to ingest
 
-        Returns:
-            None: None
-        """
-        self.index_dir = index_directory
-        self.bm25 = BM25Index()
-        self.vector = VectorIndex(MODEL_VECTOR)
+    Returns:
+        None: None
+    """
+    path = Path(input_dir)
+    if not path.is_dir():
+        raise ValueError("Input directory not found")
 
-    def index_and_save(
-        self,
-        max_chunk_size: int,
-        input_dir: str,
-    ) -> None:
-        """
-        Ingest, index and save to file a directory's data.
+    chunks = []
 
-        Args:
-            max_chunk_size (int): Maximum size of output chunks
-            input_dir (str): Path of input directory to ingest
-
-        Returns:
-            None: None
-        """
-        chunker = Chunker()
-        docs = chunker.parse_dir(input_dir, "*.py")
-        docs += chunker.parse_dir(input_dir, "*.md")
-        docs += chunker.parse_dir(input_dir, "*.txt")
-
-        docs = chunker.chunkify(docs, max_chunk_size)
-
-        sources = chunker.convert_docs_to_sources(docs)
-        unique_srcs = list(set(sources))
-
-        if len(unique_srcs) < 1:
-            raise ValueError(
-                "No chunks computed, try increasing 'max_chunk_size'"
+    for file in path.rglob("*.py"):
+        if file.is_file():
+            chunks += chunk_python_file(
+                str(file), file.read_text(), max_chunk_size
             )
 
-        self.bm25.index(unique_srcs)
-        self.bm25.save(self.index_dir)
+    for file in path.rglob("*.md"):
+        if file.is_file():
+            chunks += chunk_markdown_file(
+                str(file), file.read_text(), max_chunk_size
+            )
 
-        self.vector.index(unique_srcs)
-        self.vector.save(self.index_dir)
+    for file in path.rglob("*.txt"):
+        if file.is_file():
+            chunks += chunk_markdown_file(
+                str(file), file.read_text(), max_chunk_size
+            )
+
+    if len(chunks) <= 0:
+        raise ValueError(
+            "No chunks computed, try increasing 'max_chunk_size'"
+        )
+
+    bm25_index_and_save(chunks, index_dir)
+    chroma_index_and_save(chunks, index_dir)
