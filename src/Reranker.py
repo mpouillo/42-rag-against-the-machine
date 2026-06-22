@@ -29,7 +29,6 @@ class Reranker:
         self,
         query: str,
         sources: List[Dict[str, Any]],
-        min_score: float = -1
     ) -> List[Dict[str, Any]]:
         """
         Rerank sources based on LLM scoring.
@@ -37,7 +36,6 @@ class Reranker:
         Args:
             query (str): The text to match against sources
             sources (List[MinimalSource]): List of sources to rerank
-            min_score (float, default=-1): Minimum score to filter sources
 
         Returns:
             List[MinimalSource]: List of reranked sources

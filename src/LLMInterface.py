@@ -1,3 +1,4 @@
+import asyncio
 import ollama
 
 
@@ -18,6 +19,7 @@ class LLMInterface:
         self.model = model
         self.client = ollama.AsyncClient()
         self._initialized = False
+        self._lock = asyncio.Lock()
 
     async def _check_ready(
         self
@@ -27,11 +29,15 @@ class LLMInterface:
         if self._initialized:
             return
 
-        local_models = await self.client.list()
-        model_names = [m.model for m in local_models.models]
+        async with self._lock:
+            if self._initialized:
+                return
 
-        if self.model not in model_names:
-            print(f"Pulling model {self.model}...")
-            await self.client.pull(self.model)
+            local_models = await self.client.list()
+            model_names = [m.model for m in local_models.models]
 
-        self._initialized = True
+            if self.model not in model_names:
+                print(f"Pulling model {self.model}...")
+                await self.client.pull(self.model)
+
+            self._initialized = True

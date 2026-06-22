@@ -15,7 +15,7 @@ from .models import (
 )
 from .RAGAnswer import RAGAnswer
 from .RAGEvaluate import RAGEvaluate
-from .RAGIndex import ingest_and_index
+from .RAGIndex import RAGIndex
 from .RAGSearch import RAGSearch
 
 
@@ -44,7 +44,8 @@ class RAGInterface(object):
                 "'max_chunk_size' must be a positive non-zero integer"
             )
 
-        ingest_and_index(max_chunk_size, INGEST_DIRECTORY, INDEX_DIRECTORY)
+        indexer = RAGIndex(INDEX_DIRECTORY)
+        indexer.ingest_and_index(max_chunk_size, INGEST_DIRECTORY)
         print(f"Ingestion complete! Indices saved under {INDEX_DIRECTORY}")
 
     def search(
