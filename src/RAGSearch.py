@@ -1,19 +1,20 @@
-import asyncio
 from collections import defaultdict
-from tqdm.asyncio import tqdm  # Use the async-native tqdm wrapper
+from tqdm.asyncio import tqdm
 from typing import Any, Dict, List
 
-from .constants import MODEL_RERANKER
+from .constants import MODEL_RERANKER, MODEL_REWRITER
 from .Reranker import Reranker
 from .QueryRewriter import QueryRewriter
-from .BM25Search import BM25Searcher
-from .ChromaSearch import ChromaSearcher
+from .BM25Pipeline import BM25Pipeline
+from .ChromaPipeline import ChromaPipeline
 
 from .models import (
+    AnsweredQuestion,
     MinimalSearchResults,
     MinimalSource,
     RagDataset,
-    StudentSearchResults
+    StudentSearchResults,
+    UnansweredQuestion
 )
 
 
@@ -23,10 +24,10 @@ class RAGSearch:
         self,
         index_dir: str,
     ) -> None:
-        self.bm25 = BM25Searcher(index_dir)
-        self.chroma = ChromaSearcher(index_dir)
+        self.bm25 = BM25Pipeline(index_dir)
+        self.chroma = ChromaPipeline(index_dir)
         self.reranker = Reranker(MODEL_RERANKER)
-        self.rewriter = QueryRewriter()
+        self.rewriter = QueryRewriter(MODEL_REWRITER)
         self._cache: Dict[str, MinimalSearchResults] = {}
 
     def compute_rrf(
@@ -55,19 +56,21 @@ class RAGSearch:
 
         return [source_map[fp] for fp in sorted_footprints]
 
-    async def search_single_entry(self, entry: Any, k: int) -> MinimalSearchResults:
+    async def search_single_entry(
+        self,
+        entry: AnsweredQuestion | UnansweredQuestion,
+        k: int
+    ) -> MinimalSearchResults:
         """Helper async task processing an individual query."""
-        # Await the rewriter cleanly without restarting the loop
-        expanded_list = await self.rewriter.rewrite_query(entry.question)
-        query = "\n".join(expanded_list)
+        expanded_queries = await self.rewriter.rewrite_query(entry.question)
+        query = "\n".join(expanded_queries)
 
-        # Keep the database lookups and reranking synchronous as they were
         bm25_results = self.bm25.search(query, 1000)
         chroma_results = self.chroma.search(query, 1000)
         rrf_results = self.compute_rrf([bm25_results, chroma_results])
 
         reranked_results = self.reranker.rerank_sources(
-            entry.question, rrf_results[:k * 2]
+            entry.question, rrf_results[:max(50, k * 2)]
         )
 
         minimal_sources = [
@@ -108,19 +111,17 @@ class RAGSearch:
         search_results = []
 
         try:
-            # tqdm.asyncio.as_completed yields results as they finish
-            # across the single persistent background event loop
             for future in tqdm.as_completed(
                 tasks,
-                desc="Searching database (Async)..."
+                desc="Searching database..."
             ):
                 result = await future
                 search_results.append(result)
 
         finally:
-            # CRITICAL: Gracefully shut down your QueryRewriter HTTP client
-            # connection pool when the dataset processing completes.
-            if hasattr(self.rewriter, "client") and hasattr(self.rewriter.client, "close"):
-                await self.rewriter.client.close()
+            if hasattr(self.rewriter, "client"):
+                client: Any = self.rewriter.client
+                if hasattr(client, "close"):
+                    await client.close()
 
         return StudentSearchResults(search_results=search_results, k=k)
