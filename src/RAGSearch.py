@@ -1,3 +1,5 @@
+"""Module connecting queries to the system's indices to find documents."""
+
 from collections import defaultdict
 from tqdm.asyncio import tqdm
 from typing import Any, Dict, List
@@ -19,11 +21,24 @@ from .models import (
 
 
 class RAGSearch:
-    """Core RAG class used to search indices for relevant sources."""
+    """Core RAG class used to search indices for relevant sources.
+
+    Attributes:
+        bm25 (BM25Pipeline): The lexical indexer for fetching chunks.
+        chroma (ChromaPipeline): The semantic indexer for fetching chunks.
+        reranker (Reranker): The model instance to score and re-sort documents.
+        rewriter (QueryRewriter): Pipeline to expand query variations.
+    """
+
     def __init__(
         self,
         index_dir: str,
     ) -> None:
+        """Initialize search components pointing to the target index directory.
+
+        Args:
+            index_dir (str): Target directory containing pipeline index data.
+        """
         self.bm25 = BM25Pipeline(index_dir)
         self.chroma = ChromaPipeline(index_dir)
         self.reranker = Reranker(MODEL_RERANKER)
@@ -35,6 +50,16 @@ class RAGSearch:
         source_lists: List[List[Dict[str, Any]]],
         rrf_k: float = 60.0
     ) -> List[Dict[str, Any]]:
+        """
+        Calculate the Reciprocal Rank Fusion (RRF) across multi-method outputs.
+
+        Args:
+            source_lists (List[List[Dict[str, Any]]]): Lists of search outputs.
+            rrf_k (float): Smoothing constant applied during fusion scoring.
+
+        Returns:
+            List[Dict[str, Any]]: Combined and ranked search results.
+        """
         rrf_scores: Dict[Any, float] = defaultdict(float)
         source_map = {}
 
@@ -61,7 +86,16 @@ class RAGSearch:
         entry: AnsweredQuestion | UnansweredQuestion,
         k: int
     ) -> MinimalSearchResults:
-        """Helper async task processing an individual query."""
+        """
+        Process an individual query using multi-method retrieval and reranking.
+
+        Args:
+            entry (AnsweredQuestion | UnansweredQuestion): The query object.
+            k (int): Number of top sources to retain post-reranking.
+
+        Returns:
+            MinimalSearchResults: Packaged results referencing metadata bounds.
+        """
         expanded_queries = await self.rewriter.rewrite_query(entry.question)
         query = "\n".join(expanded_queries)
 
@@ -100,8 +134,14 @@ class RAGSearch:
         dataset: RagDataset,
         k: int
     ) -> StudentSearchResults:
-        """
-        Search index asynchronously using tqdm to track progress.
+        """Execute search asynchronously across an entire dataset of queries.
+
+        Args:
+            dataset (RagDataset): The collection of user queries to batch.
+            k (int): Standard limit of documents retrieved per query.
+
+        Returns:
+            StudentSearchResults: The resulting structure.
         """
         tasks = [
             self.search_single_entry(entry, k)

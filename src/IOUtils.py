@@ -1,30 +1,34 @@
-from collections import defaultdict
+"""Utility functions for file input/output and model serialization."""
+
 from pathlib import Path
 from pydantic import BaseModel, ValidationError
-from typing import List, Type, TypeVar
-
-from .models import MinimalSource
+from typing import Type, TypeVar
 
 T = TypeVar("T", bound=BaseModel)
 
 
 class IOUtils:
-    """Helper class providing utiliy functions for IO and object management."""
+    """Helper class providing utility functions for IO/object management."""
+
     @staticmethod
     def load_json_as_model(
         file_path: str,
         model_cls: Type[T]
     ) -> T:
-        """
-        Read data from file and return a Pydantic object.
+        """Read data from a JSON file and return a validated Pydantic object.
 
         Args:
-        - file_path (str): path to the file to be read
-        - model_cls (Type[BaseModel]): Pydantic class with which
-        to validate read data
+            file_path (str): Path to the JSON file to be read.
+            model_cls (Type[BaseModel]): Pydantic class used to
+                validate the data.
 
         Returns:
-            BaseModel: Pydantic object loaded from file data
+            BaseModel: A populated Pydantic object loaded from the file data.
+
+        Raises:
+            FileNotFoundError: If the specified file does not exist.
+            ValueError: If the file data fails Pydantic validation
+                or JSON parsing.
         """
         path = Path(file_path)
         if not path.exists():
@@ -45,15 +49,14 @@ class IOUtils:
         file_path: str,
         obj: BaseModel
     ) -> None:
-        """
-        Save Pydantic object to file.
+        """Serialize and save a Pydantic object to a file as JSON.
 
         Args:
-        - file_path (str): path where data should be saved
-        - obj (BaseModel): Pydantic object to save to file
+            file_path (str): Destination path where the data should be saved.
+            obj (BaseModel): The Pydantic object to be saved to the file.
 
-        Returns:
-            None: Object data written to file
+        Raises:
+            OSError: If writing the file to the disk fails.
         """
         try:
             path = Path(file_path)
@@ -71,16 +74,19 @@ class IOUtils:
         first_character_index: int = 0,
         last_character_index: int | None = None
     ) -> str:
-        """
-        Return text data read from file.
+        """Extract a specific sequence of characters from a text file.
 
         Args:
-        - file_path (str): path to the file to be read
-        - first_character_index (int) = 0: start index to return
-        - last_character_index (int | None) = None: end index to return
+            file_path (str): Path to the target file.
+            first_character_index (int): Starting index slice.
+            last_character_index (int | None): Ending index slice.
 
         Returns:
-            str: Text data read from file
+            str: The text data read and sliced from the file.
+
+        Raises:
+            TypeError: If the provided indices are not integers or None.
+            OSError: If the file cannot be read from the disk.
         """
         try:
             text = Path(file_path).read_text(encoding="utf-8")
@@ -95,144 +101,3 @@ class IOUtils:
             raise OSError(
                 f"Failed to read data from {file_path}. Reason: {e}"
             ) from e
-
-    @staticmethod
-    def deduplicate_sources(
-        sources: List[MinimalSource],
-    ) -> List[MinimalSource]:
-        """
-        Remove duplicate MinimalSources and merge overlapping/adjacent segments
-        within the same file, without exceeding max_chunk_size.
-
-        Original order is not guaranteed.
-
-        Args:
-            sources (List[MinimalSource]): List of MinimalSources to process
-
-        Returns:
-            List[MinimalSource]: Sorted, deduplicated, and merged sources
-        """
-        if not sources:
-            return []
-
-        max_chunk_size = max(
-            src.last_character_index - src.first_character_index
-            for src in sources
-        )
-
-        file_groups = defaultdict(list)
-        for src in sources:
-            file_groups[src.file_path].append(src)
-
-        final_merged = []
-
-        for file_path, file_srcs in file_groups.items():
-            file_srcs.sort(key=lambda x: (
-                x.first_character_index, -x.last_character_index
-            ))
-
-            current_merged = file_srcs[0]
-
-            for next_src in file_srcs[1:]:
-                curr_start = current_merged.first_character_index
-                curr_end = current_merged.last_character_index
-
-                next_start = next_src.first_character_index
-                next_end = next_src.last_character_index
-
-                if next_start >= curr_start and next_end <= curr_end:
-                    continue
-
-                elif next_start <= curr_end:
-                    potential_end = max(curr_end, next_end)
-                    potential_size = potential_end - curr_start
-
-                    if potential_size <= max_chunk_size:
-                        current_merged.last_character_index = potential_end
-                    else:
-                        final_merged.append(current_merged)
-                        current_merged = next_src
-
-                else:
-                    final_merged.append(current_merged)
-                    current_merged = next_src
-
-            final_merged.append(current_merged)
-
-        return final_merged
-
-    @staticmethod
-    def deduplicate_sources_and_keep_order(
-        sources: List[MinimalSource],
-    ) -> List[MinimalSource]:
-        """
-        Remove duplicate MinimalSources and merge overlapping/adjacent segments
-        within the same file, without exceeding max_chunk_size.
-
-        This version actually preserves the original order, except it gets me
-        worse recall for some reason?? So whatever, it's here if needed
-        during evaluation.
-
-        Args:
-            sources (List[MinimalSource]): List of MinimalSources to process
-
-        Returns:
-            List[MinimalSource]: Sorted, deduplicated, and merged sources
-        """
-        if not sources:
-            return []
-
-        max_chunk_size = max(
-            src.last_character_index - src.first_character_index
-            for src in sources
-        )
-
-        indexed_sources = list(enumerate(sources))
-
-        file_groups = defaultdict(list)
-        for original_idx, src in indexed_sources:
-            file_groups[src.file_path].append((original_idx, src))
-
-        final_sources = []
-
-        for file_path, items in file_groups.items():
-            items.sort(key=lambda x: (
-                x[1].first_character_index, -x[1].last_character_index
-            ))
-
-            curr_orig_idx, current_src = items[0]
-            current_merged = current_src.model_copy()
-
-            for next_orig_idx, next_src in items[1:]:
-                curr_start = current_merged.first_character_index
-                curr_end = current_merged.last_character_index
-
-                next_start = next_src.first_character_index
-                next_end = next_src.last_character_index
-
-                # Contained
-                if next_start >= curr_start and next_end <= curr_end:
-                    continue
-
-                # Overlap
-                elif next_start <= curr_end:
-                    potential_end = max(curr_end, next_end)
-                    if (potential_end - curr_start) <= max_chunk_size:
-                        current_merged.last_character_index = potential_end
-                        curr_orig_idx = min(curr_orig_idx, next_orig_idx)
-                    else:
-                        final_sources.append((curr_orig_idx, current_merged))
-                        curr_orig_idx = next_orig_idx
-                        current_merged = next_src.model_copy()
-
-                # No overlap
-                else:
-                    final_sources.append((curr_orig_idx, current_merged))
-                    curr_orig_idx = next_orig_idx
-                    current_merged = next_src.model_copy()
-
-            final_sources.append((curr_orig_idx, current_merged))
-
-        final_sources.sort(key=lambda x: x[0])
-
-        return [src for _, src in final_sources]

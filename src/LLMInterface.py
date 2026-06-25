@@ -1,20 +1,26 @@
+"""Module handling the base connection to the local LLM via Ollama."""
+
 import asyncio
 import ollama
 
 
 class LLMInterface:
+    """Base class for managing the state and interactions with the local LLM.
+
+    Attributes:
+        model (str): Name of the LLM model to be used.
+        client (ollama.AsyncClient): The asynchronous Ollama client instance.
+    """
+
     def __init__(
         self,
         model: str = "qwen3:0.6b"
     ) -> None:
         """
-        Initialize LLM client.
+        Initialize the LLM client and setup threading locks for model pulling.
 
         Args:
-            model (str): Name of the model to use
-
-        Returns:
-            None: None
+            model (str): Name of the model to use. Defaults to "qwen3:0.6b".
         """
         self.model = model
         self.client = ollama.AsyncClient()
@@ -24,8 +30,13 @@ class LLMInterface:
     async def _check_ready(
         self
     ) -> None:
-        """Helper function to pull requested model if needed."""
+        """
+        Check if the designated model is available locally,
+        pulling it if necessary.
 
+        This method acts as a safeguard before executing generation tasks,
+        ensuring the requested model is downloaded and ready for inference.
+        """
         if self._initialized:
             return
 

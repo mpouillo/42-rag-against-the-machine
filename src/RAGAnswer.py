@@ -1,3 +1,5 @@
+"""Module used to query the LLM to answer questions using passed contexts."""
+
 import asyncio
 
 from tqdm.asyncio import tqdm_asyncio
@@ -20,19 +22,19 @@ from .models import (
 
 
 class RAGAnswer(LLMInterface):
-    """Core RAG class used to answer queries based on provided sources."""
+    """Core RAG class used to answer queries based on provided sources.
+
+    Inherits from LLMInterface to interact with the chosen language model.
+    """
+
     def __init__(
         self,
         model: str = "qwen3:0.6b"
     ) -> None:
-        """
-        Initialize LLM client.
+        """Initialize the RAG Answerer and its underlying LLM client.
 
         Args:
-            model (str): Name of the model to use
-
-        Returns:
-            None: None
+            model (str): Name of the model to use. Defaults to "qwen3:0.6b".
         """
         super().__init__(model)
 
@@ -40,19 +42,27 @@ class RAGAnswer(LLMInterface):
         self,
         dataset: StudentSearchResults
     ) -> StudentSearchResultsAndAnswer:
-        """
-        Answer queries from a StudentSearchResults object using an LLM.
+        """Answer queries from a StudentSearchResults object using an LLM.
 
         Args:
-            dataset (StudentSearchResults): dataset to process
+            dataset (StudentSearchResults): The dataset of searches to process.
 
         Returns:
-            StudentSearchResultsAndAnswer: dataset with added LLM responses.
+            StudentSearchResultsAndAnswer: Dataset containing LLM responses.
         """
         await self._check_ready()
         sem = asyncio.Semaphore(8)
 
         async def process_entry(entry: MinimalSearchResults) -> MinimalAnswer:
+            """Process a single query to generate a context-augmented answer.
+
+            Args:
+                entry (MinimalSearchResults): A single minimal search result
+                    containing the query and sources.
+
+            Returns:
+                MinimalAnswer: The result containing the generated LLM text.
+            """
             async with sem:
                 context = [
                     IOUtils.get_text_from_file(**src.model_dump())

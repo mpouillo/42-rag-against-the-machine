@@ -1,22 +1,33 @@
+"""Module handling the expansion and rewriting of search queries."""
+
 from typing import List
 
 from .LLMInterface import LLMInterface
 
 
 class QueryRewriter(LLMInterface):
-    """Local query expansion pipeline."""
+    """Local query expansion pipeline.
+
+    Inherits from LLMInterface to interact with a local language model and
+    generate query variants to improve retrieval success.
+    """
 
     def __init__(self, model: str = "gemma2:2b"):
+        """Initialize the query rewriter using a specific local LLM.
+
+        Args:
+            model (str): The model string to be passed to the LLM backend.
+        """
         super().__init__(model)
 
     async def rewrite_query(self, query: str) -> List[str]:
-        """
-        Expands a user query into multiple variations using the local LLM.
+        """Expand a user query into multiple variations using the local LLM.
 
         Args:
             query (str): The original user search query.
+
         Returns:
-            List[str]: A list of unique expanded queries.
+            List[str]: A list of unique expanded query alternatives.
         """
         await self._check_ready()
 
