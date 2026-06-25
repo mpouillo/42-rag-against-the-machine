@@ -193,34 +193,32 @@ flowchart TB
 
 ```shell
 $> uv run python3 -m src index --max_chunk_size 2000
-$> Split strings: 100%|████████████████████████████| 206119/206119 [00:02<00:00, 97698.09it/s]
-$> Stem Tokens: 100%|████████████████████████████| 206119/206119 [00:00<00:00, 1221314.44it/s]
-$> 100%|████████████████████████████████████████████████████| 202/202 [00:03<00:00, 54.83it/s]
+$> Finding newlines for mmindex: 100%|████████████████████████████| 24.8M/24.8M [00:00<00:00, 652MB/s]
+$> Indexing with ChromaDB...: 100%|███████████████████████████████████| 33/33 [00:12<00:00,  2.64it/s]
 $> Ingestion complete! Indices saved under data/processed/
 
-$> export HYBRID_RETRIEVAL=True
 $> uv run python3 -m src search "Where can I find information about using vllm?" --k 3
-$> Processing queries: 100%|████████████████████████████████████| 1/1 [00:00<00:00,  5.07it/s]
+$> Searching database...: 100%|█████████████████████████████████████████| 1/1 [00:01<00:00,  1.84s/it]
 $> {
 $>     "search_results": [
 $>         {
-$>             "question_id": "433d77b9-d964-4378-9e8b-d752c3512b29",
+$>             "question_id": "441b0afc-57f4-4111-8401-202d0344d369",
 $>             "question": "Where can I find information about using vllm?",
 $>             "retrieved_sources": [
 $>                 {
 $>                     "file_path": "data/raw/vllm-0.10.1/CONTRIBUTING.md",
 $>                     "first_character_index": 0,
-$>                     "last_character_index": 139
+$>                     "last_character_index": 140
 $>                 },
 $>                 {
-$>                     "file_path": "data/raw/vllm-0.10.1/docs/design/mm_processing.md",
-$>                     "first_character_index": 1025,
-$>                     "last_character_index": 1512
+$>                     "file_path": "data/raw/vllm-0.10.1/docs/contributing/vulnerability_management.md",
+$>                     "first_character_index": 816,
+$>                     "last_character_index": 1153
 $>                 },
 $>                 {
-$>                     "file_path": "data/raw/vllm-0.10.1/docs/getting_started/installation/gpu/cuda.inc.md",
-$>                     "first_character_index": 7120,
-$>                     "last_character_index": 7493
+$>                     "file_path": "data/raw/vllm-0.10.1/docs/examples/README.md",
+$>                     "first_character_index": 0,
+$>                     "last_character_index": 424
 $>                 }
 $>             ]
 $>         }
@@ -229,39 +227,35 @@ $>     "k": 3
 $> }
 
 $> uv run python3 -m src search_dataset --dataset_path data/datasets_public/public/UnansweredQuestions/dataset_docs_public.json --k 10 --save_directory data/output/search_results
-$> Fetching 10 files: 100%|███████████████████████████████| 10/10 [00:00<00:00, 272357.40it/s]
-$> Download complete: : 0.00B [00:00, ?B/s]                            | 0/10 [00:00<?, ?it/s]
-$> Processing queries: 100%|████████████████████████████████| 100/100 [01:35<00:00,  1.05it/s]
+$> Searching database...: 100%|█████████████████████████████████████| 100/100 [00:19<00:00,  5.09it/s]
 $> Saved dataset_docs_public to data/output/search_results/dataset_docs_public.json
 
 $> uv run python3 -m src answer "Where can I find information about using vllm?" --k 3
-$> Fetching 10 files: 100%|███████████████████████████████| 10/10 [00:00<00:00, 257319.26it/s]
-$> Download complete: : 0.00B [00:00, ?B/s]                            | 0/10 [00:00<?, ?it/s]
-$> Processing queries: 100%|████████████████████████████████████| 1/1 [00:00<00:00,  4.32it/s]
-$> Answering queries: 100%|█████████████████████████████████████| 1/1 [00:01<00:00,  1.39s/it]
+$> Searching database...: 100%|█████████████████████████████████████████| 1/1 [00:00<00:00,  1.50it/s]
+$> Answering queries: 100%|█████████████████████████████████████████████| 1/1 [00:00<00:00,  5.78it/s]
 $> {
 $>     "search_results": [
 $>         {
-$>             "question_id": "9d0d863a-dd2b-473f-8860-52ec449ee664",
+$>             "question_id": "71a4e1e8-c770-4fbc-8c14-227d169485e5",
 $>             "question": "Where can I find information about using vllm?",
 $>             "retrieved_sources": [
 $>                 {
 $>                     "file_path": "data/raw/vllm-0.10.1/CONTRIBUTING.md",
 $>                     "first_character_index": 0,
-$>                     "last_character_index": 139
+$>                     "last_character_index": 140
 $>                 },
 $>                 {
-$>                     "file_path": "data/raw/vllm-0.10.1/docs/getting_started/installation/gpu/cuda.inc.md",
-$>                     "first_character_index": 7389,
-$>                     "last_character_index": 7493
+$>                     "file_path": "data/raw/vllm-0.10.1/docs/contributing/vulnerability_management.md",
+$>                     "first_character_index": 816,
+$>                     "last_character_index": 1153
 $>                 },
 $>                 {
-$>                     "file_path": "data/raw/vllm-0.10.1/docs/design/mm_processing.md",
-$>                     "first_character_index": 1025,
-$>                     "last_character_index": 1512
+$>                     "file_path": "data/raw/vllm-0.10.1/docs/examples/README.md",
+$>                     "first_character_index": 0,
+$>                     "last_character_index": 424
 $>                 }
 $>             ],
-$>             "answer": "To find information about using vLLM, visit [docs.vllm.ai](https://docs.vllm.ai/en/latest/contributing/)."
+$>             "answer": "To find information about using vLLM, visit the [Online Serving](./online_serving/) page for HTTP applications or the [Offline Inference](./offline_inference/) page for Python code."
 $>         }
 $>     ],
 $>     "k": 3
@@ -269,7 +263,7 @@ $> }
 
 $> uv run python3 -m src answer_dataset --student_search_results_path data/output/search_results/dataset_docs_public.json --save_directory data/output/search_results_and_answer
 $> Loaded 100 questions from data/output/search_results/dataset_docs_public.json
-$> Answering queries: 100%|█████████████████████████████████| 100/100 [00:35<00:00,  2.82it/s]
+$> Answering queries: 100%|█████████████████████████████████████████| 100/100 [00:10<00:00,  9.27it/s]
 $> Processed 100 of 100 questions
 $> Saved student_search_results_and_answer to data/output/search_results_and_answer/dataset_docs_public.json
 
@@ -282,10 +276,10 @@ $>
 $> Evaluation Results
 $> ========================================
 $> Questions evaluated: 100
-$> Recall@1:  0.570
-$> Recall@3:  0.840
-$> Recall@5:  0.860
-$> Recall@10: 0.870
+$> Recall@1:  0.620
+$> Recall@3:  0.850
+$> Recall@5:  0.870
+$> Recall@10: 0.920
 ```
 
 ## Resources
@@ -300,7 +294,7 @@ $> Recall@10: 0.870
 - [model2vec Github repository](https://github.com/MinishLab/model2vec)
 - [Reciprocal Rank Fusion (RRF) explained in 4 mins — How to score results from multiple retrieval methods in RAG](https://medium.com/@devalshah1619/mathematical-intuition-behind-reciprocal-rank-fusion-rrf-explained-in-2-mins-002df0cc5e2a)
 - [Understanding Vector Indexing: A Comprehensive Guide](https://medium.com/@myscale/understanding-vector-indexing-a-comprehensive-guide-d1abe36ccd3c)
-- AI was used to learn programming concepts and help with debugging.
+- AI was used to learn programming concepts and help with debugging and project restructuring.
 
 
 ---
