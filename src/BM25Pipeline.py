@@ -1,3 +1,5 @@
+"""BM25 indexing and retrieval pipeline."""
+
 import bm25s
 import re
 
@@ -8,7 +10,19 @@ from .models import CodeChunk
 
 
 class BM25Pipeline:
+    """Manages the creation, saving, and searching of a BM25 document index.
+
+    Attributes:
+        path (Path): The file path where the BM25 index is stored.
+        retriever (bm25s.BM25 | None): The active BM25 retriever instance.
+    """
+
     def __init__(self, index_dir: str = ".") -> None:
+        """Initialize the BM25 pipeline. Load an existing index if available.
+
+        Args:
+            index_dir (str): Root directory to store or load the index.
+        """
         self.path = Path(index_dir) / "bm25_index"
         self.path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -21,6 +35,11 @@ class BM25Pipeline:
         self,
         chunks: List[CodeChunk],
     ) -> None:
+        """Process, tokenize, index and save to disk a list of code chunks.
+
+        Args:
+            chunks (List[CodeChunk]): List of chunked documents to be indexed.
+        """
         corpus_texts = [chunk.text for chunk in chunks]
 
         metadata_corpus = []
@@ -40,6 +59,18 @@ class BM25Pipeline:
         self.retriever = retriever
 
     def search(self, query: str, k: int = 10) -> List[Dict[str, Any]]:
+        """Retrieve the top-k most relevant chunks for a given query.
+
+        Args:
+            query (str): The search query string.
+            k (int): The number of top results to return. Defaults to 10.
+
+        Returns:
+            List[Dict[str, Any]]: Formatted results.
+
+        Raises:
+            FileNotFoundError: If search is attempted before an index exists.
+        """
         if not self.retriever:
             raise FileNotFoundError("No index found. Run '.index' first.")
 
@@ -59,6 +90,14 @@ class BM25Pipeline:
 
     @staticmethod
     def tokenize_code(text: str) -> List[str]:
+        """Tokenize a string of code, handling snake_case and camelCase splits.
+
+        Args:
+            text (str): The raw text or code to tokenize.
+
+        Returns:
+            List[str]: A list of processed and extended tokens.
+        """
         tokens = re.findall(r'\w+', text.lower())
         extended_tokens = list(tokens)
 

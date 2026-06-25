@@ -1,4 +1,4 @@
-"""Constant variables for easy tweaking."""
+"""Constant variables and configurations for easy system tweaking."""
 
 # Path
 INDEX_DIRECTORY = "data/processed/"

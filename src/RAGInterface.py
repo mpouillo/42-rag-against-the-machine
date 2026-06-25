@@ -1,3 +1,5 @@
+"""Provides a command-line interface integrating the core RAG functions."""
+
 import asyncio
 import json
 
@@ -20,20 +22,19 @@ from .RAGSearch import RAGSearch
 
 
 class RAGInterface(object):
-    """Core RAG class used to provide main RAG functions."""
+    """Core RAG class used to provide main system interface functions."""
+
     def index(
         self,
         max_chunk_size: int = 2000
     ) -> None:
-        """
-        Index data from INGEST_DIRECTORY ("data/raw") and
-        save them to INDEX_DIRECTORY ("data/processed")
+        """Index data from raw ingestion path and save it to disk.
 
         Args:
-            max_chunk_size (int): Maximum size of output chunks
+            max_chunk_size (int): Maximum size of output chunks.
 
-        Returns:
-            None: None
+        Raises:
+            ValueError: If `max_chunk_size` is not a positive non-zero integer.
         """
         try:
             max_chunk_size = int(max_chunk_size)
@@ -53,15 +54,17 @@ class RAGInterface(object):
         query: str,
         k: int = 10
     ) -> str:
-        """
-        Search index and retrieve top k matching sources for provided query.
+        """Search the index and retrieve top k matching sources.
 
         Args:
-            query (str): The text to match against local index
-            k (int): The number of sources to be provided
+            query (str): The text to match against the local index.
+            k (int): The maximum number of sources to provide. Defaults to 10.
 
         Returns:
-            str: JSOn-formatted string of the retrieved StudentSearchResults.
+            str: JSON-formatted string of the retrieved StudentSearchResults.
+
+        Raises:
+            ValueError: If `k` is not a positive non-zero integer.
         """
         query = str(query)
 
@@ -87,19 +90,15 @@ class RAGInterface(object):
         k: int = 10,
         save_directory: str = SEARCH_DIRECTORY
     ) -> None:
-        """
-        Search index and retrieve top k matching sources for each query
-        in the provided dataset.
+        """Search index and retrieve top k sources for each query in a dataset.
 
         Args:
-            dataset_path (str): Path to the dataset to process
-            k (int): The number of sources to retrieve
-            save_directory (str, default=SEARCH_DIRECTORY): Directory to save
-            search results
+            dataset_path (str): Path to the dataset to process.
+            k (int): The number of sources to retrieve. Defaults to 10.
+            save_directory (str): Directory to save search results.
 
-        Returns:
-            None: JSOn-formatted string of the retrieved StudentSearchResults
-            saved to file.
+        Raises:
+            ValueError: If `k` is not a positive non-zero integer.
         """
         dataset_path = str(dataset_path)
         save_directory = str(save_directory)
@@ -125,17 +124,18 @@ class RAGInterface(object):
         query: str,
         k: int = 10
     ) -> str:
-        """
-        Search index and retrieve top k matching sources for provided query,
-        then answer them using a LLM.
+        """Search index for a query, retrieve k sources, and answer via LLM.
 
         Args:
-            query (str): The text to match against local index
-            k (int): The number of sources to be provided
+            query (str): The text to match against the local index.
+            k (int): The number of sources to use for context. Defaults to 10.
 
         Returns:
-            str: JSOn-formatted string of the retrieved
-            StudentSearchResultsAndAnswer.
+            str: JSON-formatted string of the
+                generated StudentSearchResultsAndAnswer.
+
+        Raises:
+            ValueError: If `k` is not a positive non-zero integer.
         """
         query = str(query)
 
@@ -155,17 +155,11 @@ class RAGInterface(object):
         student_search_results_path: str,
         save_directory: str = SEARCH_DIRECTORY
     ) -> None:
-        """
-        Answer dataset queries based on retrieved sources using a LLM.
+        """Answer dataset queries based on retrieved sources using an LLM.
 
         Args:
-            student_search_results_path (str): Path to the dataset to process
-            save_directory (str, default=SEARCH_DIRECTORY): Directory to save
-            search results
-
-        Returns:
-            None: JSOn-formatted string of the retrieved
-            StudentSearchResultsAndAnswer saved to file.
+            student_search_results_path (str): Path to the processed dataset.
+            save_directory (str): Directory to save final results.
         """
         student_search_results_path = str(student_search_results_path)
         save_directory = str(save_directory)
@@ -192,17 +186,17 @@ class RAGInterface(object):
         k: int,
         max_context_length: int
     ) -> None:
-        """
-        Evaluate student search results based on reference dataset.
+        """Evaluate student search results based on a reference dataset.
 
         Args:
-            student_answer_path (str): Path to the dataset to process
-            dataset_path (str): Path to the reference dataset to process
-            k (int): The number of sources to be provided
-            max_chunk_size (int): Maximum size of output chunks
+            student_answer_path (str): Path to the predictions dataset.
+            dataset_path (str): Path to the reference truth dataset.
+            k (int): The limit of retrieved sources to factor into evaluation.
+            max_context_length (int): Maximum length constraints to consider.
 
-        Returns:
-            None: Terminal output of the evaluation results.
+        Raises:
+            ValueError: If `k` or `max_context_length`
+                are not positive integers.
         """
         student_answer_path = str(student_answer_path)
         dataset_path = str(dataset_path)

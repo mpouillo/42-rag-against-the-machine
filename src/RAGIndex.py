@@ -1,3 +1,5 @@
+"""Module for managing the system's indexing processes across pipelines."""
+
 from pathlib import Path
 
 from .BM25Pipeline import BM25Pipeline
@@ -6,7 +8,19 @@ from .Chunker import chunk_markdown_file, chunk_python_file
 
 
 class RAGIndex:
+    """Orchestrates indexing of documents across different search pipelines.
+
+    Attributes:
+        bm25 (BM25Pipeline): The lexical retrieval indexing handler.
+        chroma (ChromaPipeline): The semantic retrieval indexing handler.
+    """
+
     def __init__(self, index_dir: str = "data/processed") -> None:
+        """Initialize both pipelines with a unified index directory.
+
+        Args:
+            index_dir (str): Directory where index data is saved.
+        """
         self.bm25 = BM25Pipeline(index_dir)
         self.chroma = ChromaPipeline(index_dir)
 
@@ -15,15 +29,15 @@ class RAGIndex:
         max_chunk_size: int,
         input_dir: str = "./data/raw/",
     ) -> None:
-        """
-        Ingest, index and save to file a directory's data.
+        """Ingest, index, and save a directory's data to the system databases.
 
         Args:
-            max_chunk_size (int): Maximum size of output chunks
-            input_dir (str): Path of input directory to ingest
+            max_chunk_size (int): Maximum size of output chunks.
+            input_dir (str): Path of the input directory to ingest.
 
-        Returns:
-            None: None
+        Raises:
+            ValueError: If the input directory is not found,
+                or if no valid chunks are produced.
         """
         path = Path(input_dir)
         if not path.is_dir():

@@ -1,3 +1,4 @@
+"""ChromaDB indexing and semantic search pipeline."""
 # chroma_searcher.py
 import chromadb
 
@@ -8,7 +9,22 @@ from tqdm import tqdm
 
 
 class ChromaPipeline:
+    """
+    Manages the creation, saving, and semantic searching of a ChromaDB index.
+
+    Attributes:
+        path (Path): The file path where the ChromaDB index is persisted.
+        client (chromadb.PersistentClient): The persistent ChromaDB client.
+        collection (chromadb.Collection): The collection storing embeddings.
+        model (SentenceTransformer): The embedding model used.
+    """
+
     def __init__(self, persist_dir: str = ".") -> None:
+        """Initialize the ChromaDB pipeline and embedding model.
+
+        Args:
+            persist_dir (str): The root directory to persist the database.
+        """
         self.path = Path(persist_dir) / "chromadb_index"
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.client = chromadb.PersistentClient(path=str(self.path))
@@ -22,6 +38,11 @@ class ChromaPipeline:
         self,
         chunks: List[Any],
     ) -> None:
+        """Embed and index a list of document chunks into ChromaDB in batches.
+
+        Args:
+            chunks (List[Any]): Chunked documents to be embedded and indexed.
+        """
         batch_size = 512
         total_chunks = len(chunks)
 
@@ -61,6 +82,15 @@ class ChromaPipeline:
             )
 
     def search(self, query: str, k: int = 10) -> List[Dict[str, Any]]:
+        """Retrieve the top-k most semantically relevant chunks for a query.
+
+        Args:
+            query (str): The search query string.
+            k (int): The number of top results to return. Defaults to 10.
+
+        Returns:
+            List[Dict[str, Any]]: Formatted search results.
+        """
         query_vector = self.model.encode(
             query,
             normalize_embeddings=True,
