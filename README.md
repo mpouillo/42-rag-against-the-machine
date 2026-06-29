@@ -50,12 +50,6 @@ $> uv run python3 -m src evaluate <student_answer_path> <dataset_path> <k> <max_
 # Evaluate student search results based on reference dataset.
 ```
 
-Enable hybrid retrieval when computing index and search results:
-
-```shell
-$> export HYBRID_RETRIEVAL=True
-```
-
 Check source code for programmatic and stylistic errors:
 
 ```shell
@@ -125,15 +119,14 @@ flowchart TB
 
 - Search:
 	- Index data is loaded.
-	- User query is rewritten using spaCy.
-	- BM25 index is queried to retrived top matching sources.
-	- if `HYBRID_RETRIEVAL` env variable is set to `True`, Vector index is also queried and sources are fused together using Reciprocal Rank Fusion (RRF).
-	- The top k * 2 sources are then passed through a FlashRank reranker model.
-	- Reranked sources are then deduplicated (removing chunks encompassed by bigger chunks)
+	- User query is rewritten using a local LLM.
+	- BM25 and ChromaDB indices are queried to retrive top matching sources.
+    - RRF (Reciprocal Rank Fusion) is used to fuse sources together.
+	- The top sources are then passed through a FlashRank reranker model.
 	- To satisfy the k criteria, sources are padded if needed by duplicating the last source.
 
 - Answer:
-	- Only the top 3 sources are passed to the LLM.
+	- Only the top sources are passed to the LLM (configurable via `constants.py`).
 	- Text data is retrieved for each source and joined into a larger context.
 	- Using ollama, a LLM generated an answer for each user question.
 	- Multithreading is used to speed up generation.
@@ -152,15 +145,15 @@ flowchart TB
 	- BM25:
 		- A ranking algorithm which measures term frequency and document relevance, accounting for document length normalization.
 		- It is very fast but can give inaccurate results depending on the structure of the text as it is not optimized to detect rare keywords in a large text, which is often the case with code for example.
-	- Vector indexing:
-		- Conversion of text into vectors (lists of numbers) using an llm, to convert meaning into data. This allows retrieval of relevant chunks based on mathematical probability from their semantic meaning.
+	- ChromaDB:
+		- Conversion of text into vectors using an llm, to convert meaning into data. This allows retrieval of relevant chunks based on mathematical probability from their semantic meaning.
 		- It is a little slower than BM25, but gives more accurate results as it can analyze semantic meaning even when keywords do not match exactly the user's query.
-	- Indexing only takes a few seconds, falling way below the subject's allowed 5 minutes.
+	- Indexing only takes a few seconds to a few minutes, depending on hardware.
 
 - Searching:
-	- Retrieving sources from indices (and fusing them together if using hybrid retrieval) is very fast as it is based on mathematical computations.
+	- Retrieving sources from indices and fusing them together is very fast as it is based on mathematical computations.
 	- Rerank:
-		- FlashRank is used to rerank sources retrieved using BM25 and Vector search to slightly improve recall@k score. A LLM model analyzes each text against the user's query and gives them a rank based on their relevance to the question.
+		- FlashRank is used to rerank sources retrieved using BM25 and ChromaDB to slightly improve recall@k score. A LLM model analyzes each text against the user's query and gives them a rank based on their relevance to the question.
 		- Searching time mostly depends on the Reranker model used, as reranking search results takes the longest time for this step. A model might take a few minutes, when another one will take a few seconds.
 
 - Answering:
@@ -168,26 +161,26 @@ flowchart TB
 
 - Recall@k:
 	- This metric is used to calculate the proportion of retrieved sources compared to a reference dataset. If any source in the top k retrieved sources overlaps with at least 5% of one from the reference dataset, the source is considered found. The final score represents the proportion of answers found over the whole dataset.
-	- For recall@5, My implementation manages to reach 90% on docs and 57% on code questions.
+	- For recall@5, My implementation manages to reach about 88% on docs and 74% on code questions.
 
-- Caching: Since `MinimalSource` objects do not contain original text data, to prevent thousands of read for each operation requiring the original corpus of files, text data is cached whenever a class needs access to it. This reduces file IO to once per file, instead of once per chunk (there can be many chunks per file depending on the requested `max_chunk_size`).
+- Caching: To prevent reprocessing queries already processed, the answer for each one is cached. If a dataset contains multiple of the same question, the answer is directly pulled from the cache instead of being reprocessed.
 
 ### Design decisions
 
-- Hybrid retrieval: By default, my RAG implementation does NOT use hybrid retrieval; it skips vector indexing and Reciprocal Rank Fusion (RRF) as it takes more time and decreases my recall@k score by a few points. However, it can be toggled with an environment variable: `export HYBRID_RETRIEVAL=True`.
+- Hybrid retrieval: RRF is used to fuse BM25s and ChromaDB results and provide more accurate results.
 
-- Query rewriting: I use spaCy to parse the user's query for keywords and append them at the end of the original query. This helps BM25 retrieve more relevant sources from its index.
+- Query rewriting: I use a local LLM to rephrase the user's query. This helps retrieve more relevant sources from indices.
 
 - Reranking: I use a FlashRank model to rerank my sources after retrieving them with BM25 (and Vector search) as I found it improved my recall@k score a little.
 
 ### Challenges faced
 
 - Packages:
-	- This project allowed us to use any package we wanted, leading me to learn many different tools: fire, langchain, bm25s, ollama, FlashRank, model2vec, spaCy, tqdm... This was as challenging as it was interesting, but nothing reading a few docs can't fix!
+	- This project allowed us to use any package we wanted, leading me to learn many different tools: fire, langchain, bm25s, chromadb, ollama, FlashRank, model2vec, spaCy, tqdm... This was as challenging as it was interesting, but nothing reading a few docs can't fix!
 
 - Recall@k:
 	- This metric was VERY hard to increase as the provided reference dataset only contains a single source, set in stone. Without knowing how it was obtained, it is very difficult to tweak the RAG pipeline to obtain results that are not simply better and more relevant to the user's query, but instead closer to the reference dataset's retrieved sources.
-	- The recall@5 score to aim for was 80% on docs questions and 50% on code, and I could not get any higher than 88% and 71% after a LOT of tweaking. Many of my attempts to increase recall by adding better indexing and search methods actually led to worse scores, which was very frustrating. In the end, only the simplest methods gave decent results, since this is probably how the reference dataset's sources were obtained.
+	- The recall@5 score to aim for was 80% on docs questions and 50% on code, and I could not get any higher than 90% and 77% after a LOT of tweaking. Many of my attempts to increase recall by adding better indexing and search methods actually led to worse scores, which was very frustrating. In the end, only the simplest methods gave decent results, since this is probably how the reference dataset's sources were obtained.
 
 ### Example usage
 
