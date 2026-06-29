@@ -6,7 +6,7 @@ INGEST_DIRECTORY = "data/raw/"
 SEARCH_DIRECTORY = "data/output/search_results"
 
 # Answerer
-LLM_CONTEXT_TRIM = 3
+LLM_CONTEXT_TRIM = 1
 LLM_FAILURE_ANSWER = "I'm sorry, but I couldn't find any relevant information \
 in the database to answer your question."
 LLM_NUM_PREDICT = 1024
@@ -42,4 +42,4 @@ MODEL_ANSWER = "qwen3:0.6b"
 MODEL_RERANKER = "ms-marco-TinyBERT-L-2-v2"
 # Slow: "ms-marco-MiniLM-L-12-v2"
 # Fast: "ms-marco-TinyBERT-L-2-v2"
-MODEL_REWRITER = "gemma2:2b"
+MODEL_REWRITER = "qwen3:0.6b"

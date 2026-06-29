@@ -1,6 +1,7 @@
 """Module connecting queries to the system's indices to find documents."""
 
 from collections import defaultdict
+import os
 from tqdm.asyncio import tqdm
 from typing import Any, Dict, List
 
@@ -96,15 +97,24 @@ class RAGSearch:
         Returns:
             MinimalSearchResults: Packaged results referencing metadata bounds.
         """
-        expanded_queries = await self.rewriter.rewrite_query(entry.question)
-        query = "\n".join(expanded_queries)
+        if entry.question in self._cache:
+            return self._cache[entry.question]
 
-        bm25_results = self.bm25.search(query, 1000)
-        chroma_results = self.chroma.search(query, 1000)
+        pool = max(100, k * 10)
+
+        if os.environ.get("RAG_BONUS") in ["True", "1"]:
+            expanded_queries = await self.rewriter.rewrite_query(
+                entry.question
+            )
+            query = "\n".join(expanded_queries)
+        else:
+            query = entry.question
+
+        bm25_results = self.bm25.search(query, pool)
+        chroma_results = self.chroma.search(query, pool)
         rrf_results = self.compute_rrf([bm25_results, chroma_results])
-
         reranked_results = self.reranker.rerank_sources(
-            entry.question, rrf_results[:max(50, k * 2)]
+            entry.question, rrf_results[:pool // 2]
         )
 
         minimal_sources = [

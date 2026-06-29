@@ -48,8 +48,10 @@ class QueryRewriter(LLMInterface):
                 ],
                 options={
                     "temperature": 0.2,
-                    "num_predict": 60
-                }
+                    "num_predict": 60,
+                    "think": False
+                },
+                think=False
             )
 
             raw_output = response['message']['content']
