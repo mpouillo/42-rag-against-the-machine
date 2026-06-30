@@ -187,7 +187,7 @@ class RAGEvaluate:
         scores = []
         gtruth_count = 0
 
-        for i, entry in enumerate(self.student.search_results, 1):
+        for entry in self.student.search_results:
             gtruth = next((q for q in self.dataset.rag_questions
                           if q.question_id == entry.question_id), None)
 
