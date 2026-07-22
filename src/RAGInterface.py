@@ -181,7 +181,7 @@ class RAGInterface(object):
 
     def evaluate(
         self,
-        student_answer_path: str,
+        student_search_results_path: str,
         dataset_path: str,
         k: int,
         max_context_length: int
@@ -189,7 +189,7 @@ class RAGInterface(object):
         """Evaluate student search results based on a reference dataset.
 
         Args:
-            student_answer_path (str): Path to the predictions dataset.
+            student_search_results_path (str): Path to the predictions dataset.
             dataset_path (str): Path to the reference truth dataset.
             k (int): The limit of retrieved sources to factor into evaluation.
             max_context_length (int): Maximum length constraints to consider.
@@ -198,7 +198,7 @@ class RAGInterface(object):
             ValueError: If `k` or `max_context_length`
                 are not positive integers.
         """
-        student_answer_path = str(student_answer_path)
+        student_search_results_path = str(student_search_results_path)
         dataset_path = str(dataset_path)
 
         try:
@@ -217,7 +217,7 @@ class RAGInterface(object):
                 "'max_context_length' must be a positive non-zero integer"
             )
 
-        evaluator = RAGEvaluate(student_answer_path, dataset_path)
+        evaluator = RAGEvaluate(student_search_results_path, dataset_path)
         evaluator.validate(k, max_context_length)
         print()
         evaluator.evaluate()

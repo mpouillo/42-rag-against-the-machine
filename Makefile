@@ -68,26 +68,35 @@ test-answer: start-server
 test-evaluate:
 	@echo "Testing evaluate..."
 	@$(UV) run python -m $(SRC) evaluate \
-	--student_answer_path data/output/search_results/dataset_$(TYPE)_public.json \
+	--student_search_results_path data/output/search_results/dataset_$(TYPE)_public.json \
 	--dataset_path data/datasets_public/public/AnsweredQuestions/dataset_$(TYPE)_public.json \
 	--k $(K) \
 	--max_context_length $(CONTEXT_LENGTH)
 
+moulinette:
+	@echo "Running moulinette..."
+	@./moulinette-ubuntu \
+	evaluate_student_search_results \
+	data/output/search_results/dataset_$(TYPE)_public.json \
+	data/datasets_public/public/AnsweredQuestions/dataset_$(TYPE)_public.json \
+	--k 10 \
+	--max_context_length 2000
+
 setup:
 	@mkdir -p data
 
-	@wget https://cdn.intra.42.fr/document/document/49092/datasets_public.zip \
+	@wget https://cdn.intra.42.fr/document/document/55070/datasets_public.zip \
 	&& unzip datasets_public.zip \
 	&& rm datasets_public.zip \
 	&& mv datasets_public data/
 
-	@wget https://cdn.intra.42.fr/document/document/49094/vllm-0.10.1.zip \
+	@wget https://cdn.intra.42.fr/document/document/55072/vllm-0.10.1.zip \
 	&& unzip vllm-0.10.1.zip \
 	&& mkdir -p data/raw/ \
 	&& rm vllm-0.10.1.zip \
 	&& mv vllm-0.10.1 data/raw/
 
-	@wget https://cdn.intra.42.fr/document/document/49095/moulinette.zip \
+	@wget https://cdn.intra.42.fr/document/document/55073/moulinette.zip \
 	&& unzip moulinette.zip \
 	&& rm moulinette.zip
 
